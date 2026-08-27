@@ -1,0 +1,9 @@
+{
+  "name": "家計簿 - 写真でかんたん家計簿",
+  "short_name": "家計簿",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f6f5",
+  "theme_color": "#16a34a",
+  "icons": []
+}
