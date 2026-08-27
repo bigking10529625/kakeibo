@@ -298,6 +298,21 @@
       </div>
 
       <div class="section-heading">
+        <h2>データの引っ越し・バックアップ</h2>
+      </div>
+      <button type="button" id="exportDataBtn" class="ghost-btn">今のデータをエクスポート</button>
+      <div id="exportBox" class="transfer-box" hidden>
+        <textarea id="exportTextarea" class="transfer-textarea" readonly rows="4"></textarea>
+        <p class="transfer-hint">↑ 全体を選択してコピーし、移行先のページで「データをインポート」に貼り付けてください</p>
+      </div>
+
+      <button type="button" id="showImportBtn" class="ghost-btn">データをインポート</button>
+      <div id="importBox" class="transfer-box" hidden>
+        <textarea id="importTextarea" class="transfer-textarea" rows="4" placeholder="コピーしたデータをここに貼り付け"></textarea>
+        <button type="button" id="importDataBtn" class="primary-btn">読み込む</button>
+      </div>
+
+      <div class="section-heading">
         <h2>全期間のデータ</h2>
       </div>
       <button type="button" id="resetDataBtn" class="ghost-btn danger">すべてのデータを削除</button>

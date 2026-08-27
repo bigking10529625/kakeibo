@@ -857,6 +857,59 @@ document.getElementById("budgetForm").addEventListener("submit", (e) => {
   showToast("予算を保存しました");
 });
 
+// ---------- データの引っ越し・バックアップ ----------
+document.getElementById("exportDataBtn").addEventListener("click", () => {
+  const payload = JSON.stringify({
+    transactions: state.transactions,
+    settings: state.settings,
+    weightLogs: state.weightLogs,
+    exportedAt: new Date().toISOString(),
+  });
+  const box = document.getElementById("exportBox");
+  const textarea = document.getElementById("exportTextarea");
+  textarea.value = payload;
+  box.hidden = false;
+  textarea.focus();
+  textarea.select();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(payload).then(
+      () => showToast("クリップボードにコピーしました"),
+      () => showToast("下の欄を手動でコピーしてください")
+    );
+  } else {
+    showToast("下の欄を手動でコピーしてください");
+  }
+});
+
+document.getElementById("showImportBtn").addEventListener("click", () => {
+  const box = document.getElementById("importBox");
+  box.hidden = !box.hidden;
+});
+
+document.getElementById("importDataBtn").addEventListener("click", () => {
+  const raw = document.getElementById("importTextarea").value.trim();
+  if (!raw) return;
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    alert("データの形式が正しくありません。コピーした内容をそのまま貼り付けてください。");
+    return;
+  }
+  if (!confirm("現在このページにあるデータを、貼り付けた内容で上書きします。よろしいですか？")) return;
+
+  state.transactions = Array.isArray(data.transactions) ? data.transactions : [];
+  state.settings = data.settings && typeof data.settings === "object" ? data.settings : { monthlyBudget: null, paydayDay: 25 };
+  state.weightLogs = Array.isArray(data.weightLogs) ? data.weightLogs : [];
+  saveTransactions();
+  saveSettings();
+  saveWeightLogs();
+  document.getElementById("importTextarea").value = "";
+  document.getElementById("importBox").hidden = true;
+  showToast("読み込みました");
+  showView("home");
+});
+
 document.getElementById("resetDataBtn").addEventListener("click", () => {
   if (confirm("すべての記録と設定を削除します。よろしいですか？")) {
     state.transactions = [];
