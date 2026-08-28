@@ -447,8 +447,8 @@ html, body {
 }
 .weight-stats-row .advice-stat.highlight { grid-column: 1 / -1; }
 
-.weight-log-details { margin-top: 22px; }
-.weight-log-details summary {
+.list-details { margin-top: 22px; }
+.list-details summary {
   list-style: none;
   cursor: pointer;
   display: flex;
@@ -463,16 +463,16 @@ html, body {
   color: var(--text);
   box-shadow: var(--shadow);
 }
-.weight-log-details summary::-webkit-details-marker { display: none; }
-.weight-log-details summary::after {
+.list-details summary::-webkit-details-marker { display: none; }
+.list-details summary::after {
   content: "▾";
   color: var(--text-muted);
   transition: transform 0.2s ease;
   margin-left: auto;
   padding-left: 8px;
 }
-.weight-log-details[open] summary::after { transform: rotate(180deg); }
-.weight-log-details .tx-list { margin-top: 10px; }
+.list-details[open] summary::after { transform: rotate(180deg); }
+.list-details .tx-list { margin-top: 10px; }
 .count-badge {
   background: var(--surface-2);
   color: var(--text-muted);

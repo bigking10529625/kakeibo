@@ -333,6 +333,7 @@ function renderHome() {
   // 一覧
   const listEl = document.getElementById("homeTxList");
   const emptyEl = document.getElementById("homeEmptyState");
+  document.getElementById("homeTxCount").textContent = `${txs.length}件`;
   listEl.innerHTML = "";
   if (txs.length === 0) {
     emptyEl.hidden = false;
@@ -670,12 +671,42 @@ function renderWeightLogList() {
   });
 }
 
-// グラフの横軸レンジ（1週間/1ヶ月/3ヶ月/すべて）
+// グラフの横軸レンジ（1週間/1ヶ月/3ヶ月/月を選択/すべて）
 let weightChartRange = "30d";
+let weightSelectedMonth = null;
 const RANGE_DAYS = { "7d": 7, "30d": 30, "90d": 90 };
-const RANGE_LABEL = { "7d": "直近1週間", "30d": "直近1ヶ月", "90d": "直近3ヶ月", all: null };
+const RANGE_LABEL = { "7d": "直近1週間", "30d": "直近1ヶ月", "90d": "直近3ヶ月", all: null, month: null };
+
+const monthLabel = (mk) => {
+  const [y, m] = mk.split("-");
+  return `${y}年${parseInt(m, 10)}月`;
+};
+
+function availableWeightMonths() {
+  const set = new Set(state.weightLogs.map((w) => monthKey(w.date)));
+  set.add(thisMonthKey());
+  return Array.from(set).sort().reverse();
+}
+
+function populateWeightMonthSelect() {
+  const sel = document.getElementById("weightMonthSelect");
+  const months = availableWeightMonths();
+  const prevValue = weightSelectedMonth || sel.value;
+  sel.innerHTML = "";
+  months.forEach((mk) => {
+    const opt = document.createElement("option");
+    opt.value = mk;
+    opt.textContent = monthLabel(mk);
+    sel.appendChild(opt);
+  });
+  sel.value = months.includes(prevValue) ? prevValue : months[0];
+  weightSelectedMonth = sel.value;
+}
 
 function filterByRange(asc, range) {
+  if (range === "month") {
+    return asc.filter((p) => monthKey(p.date) === weightSelectedMonth);
+  }
   if (range === "all" || !RANGE_DAYS[range]) return asc;
   const cutoff = todayMidnight();
   cutoff.setDate(cutoff.getDate() - (RANGE_DAYS[range] - 1));
@@ -687,8 +718,20 @@ document.querySelectorAll(".range-pill").forEach((btn) => {
     document.querySelectorAll(".range-pill").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     weightChartRange = btn.dataset.range;
+    const monthSelect = document.getElementById("weightMonthSelect");
+    if (weightChartRange === "month") {
+      populateWeightMonthSelect();
+      monthSelect.hidden = false;
+    } else {
+      monthSelect.hidden = true;
+    }
     renderWeight();
   });
+});
+
+document.getElementById("weightMonthSelect").addEventListener("change", (e) => {
+  weightSelectedMonth = e.target.value;
+  renderWeight();
 });
 
 function renderWeight() {
@@ -758,7 +801,12 @@ function renderWeightProgressBadge(points, range) {
   const diff = Math.round((last.weight - first.weight) * 10) / 10;
   const days = Math.max(1, diffDays(txDate(last), txDate(first)));
   const fromLabel = first.date.slice(5).replace("-", "/");
-  const periodPhrase = RANGE_LABEL[range] ? `${RANGE_LABEL[range]}で` : `${fromLabel}の記録開始から ${days}日間で`;
+  const periodPhrase =
+    range === "month" && weightSelectedMonth
+      ? `${monthLabel(weightSelectedMonth)}で`
+      : RANGE_LABEL[range]
+      ? `${RANGE_LABEL[range]}で`
+      : `${fromLabel}の記録開始から ${days}日間で`;
 
   badge.hidden = false;
   if (diff < 0) {

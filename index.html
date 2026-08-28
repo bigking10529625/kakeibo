@@ -67,11 +67,11 @@
       </div>
       <div id="homeCategoryList" class="category-list"></div>
 
-      <div class="section-heading">
-        <h2>最近の記録</h2>
-      </div>
-      <div id="homeTxList" class="tx-list"></div>
-      <p id="homeEmptyState" class="empty-state" hidden>まだ記録がありません。「追加」タブからレシート写真を読み込んでみましょう。</p>
+      <details class="list-details" id="homeTxDetails">
+        <summary>最近の記録を見る<span class="count-badge" id="homeTxCount">0件</span></summary>
+        <div id="homeTxList" class="tx-list"></div>
+        <p id="homeEmptyState" class="empty-state" hidden>まだ記録がありません。「追加」タブからレシート写真を読み込んでみましょう。</p>
+      </details>
     </section>
 
     <!-- 追加 -->
@@ -193,8 +193,10 @@
         <button type="button" class="range-pill" data-range="7d">1週間</button>
         <button type="button" class="range-pill active" data-range="30d">1ヶ月</button>
         <button type="button" class="range-pill" data-range="90d">3ヶ月</button>
+        <button type="button" class="range-pill" data-range="month">月を選択</button>
         <button type="button" class="range-pill" data-range="all">すべて</button>
       </div>
+      <select id="weightMonthSelect" class="month-select" hidden></select>
 
       <div id="weightChartWrap" class="weight-chart-wrap" hidden>
         <div class="weight-progress-badge" id="weightProgressBadge" hidden>
@@ -240,7 +242,7 @@
         <button type="submit" class="primary-btn">記録する</button>
       </form>
 
-      <details class="weight-log-details" id="weightLogDetails">
+      <details class="list-details" id="weightLogDetails">
         <summary>記録一覧を見る<span class="count-badge" id="weightLogCount">0件</span></summary>
         <div id="weightLogList" class="tx-list"></div>
       </details>
