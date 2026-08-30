@@ -160,18 +160,30 @@
 
     <!-- 体重 -->
     <section id="view-weight" class="view">
-      <div class="section-heading" style="margin-top:10px;">
-        <h2>目標体重</h2>
-      </div>
-      <form id="targetWeightForm" class="tx-form inline-form">
+      <form id="weightForm" class="tx-form" style="margin-top:10px;">
         <label class="field">
-          <span>目標体重（任意）</span>
+          <span>体重</span>
           <div class="amount-input-wrap">
-            <input type="number" id="targetWeight" inputmode="decimal" step="0.1" min="0" placeholder="例）60.0" />
+            <input type="number" id="weightInput" inputmode="decimal" step="0.1" min="0" required placeholder="例）62.5" />
             <span class="unit-suffix">kg</span>
           </div>
         </label>
-        <button type="submit" class="ghost-btn">保存</button>
+        <label class="field">
+          <span>体脂肪率（任意）</span>
+          <div class="amount-input-wrap">
+            <input type="number" id="bodyFatInput" inputmode="decimal" step="0.1" min="0" max="100" placeholder="例）22.0" />
+            <span class="unit-suffix">%</span>
+          </div>
+        </label>
+        <label class="field">
+          <span>日付</span>
+          <input type="date" id="weightDate" required />
+        </label>
+        <label class="field">
+          <span>メモ（任意）</span>
+          <input type="text" id="weightMemo" placeholder="例）朝食前" />
+        </label>
+        <button type="submit" class="primary-btn">記録する</button>
       </form>
 
       <div class="weight-stats-row">
@@ -211,41 +223,26 @@
         <div id="weightChart"></div>
         <p id="weightRangeEmpty" class="empty-state" hidden>この期間の記録がありません。</p>
       </div>
-      <p id="weightChartEmpty" class="empty-state">まだ記録がありません。下のフォームから体重を記録してみましょう。</p>
-
-      <div class="section-heading">
-        <h2>記録する</h2>
-      </div>
-      <form id="weightForm" class="tx-form">
-        <label class="field">
-          <span>体重</span>
-          <div class="amount-input-wrap">
-            <input type="number" id="weightInput" inputmode="decimal" step="0.1" min="0" required placeholder="例）62.5" />
-            <span class="unit-suffix">kg</span>
-          </div>
-        </label>
-        <label class="field">
-          <span>体脂肪率（任意）</span>
-          <div class="amount-input-wrap">
-            <input type="number" id="bodyFatInput" inputmode="decimal" step="0.1" min="0" max="100" placeholder="例）22.0" />
-            <span class="unit-suffix">%</span>
-          </div>
-        </label>
-        <label class="field">
-          <span>日付</span>
-          <input type="date" id="weightDate" required />
-        </label>
-        <label class="field">
-          <span>メモ（任意）</span>
-          <input type="text" id="weightMemo" placeholder="例）朝食前" />
-        </label>
-        <button type="submit" class="primary-btn">記録する</button>
-      </form>
+      <p id="weightChartEmpty" class="empty-state">まだ記録がありません。上のフォームから体重を記録してみましょう。</p>
 
       <details class="list-details" id="weightLogDetails">
         <summary>記録一覧を見る<span class="count-badge" id="weightLogCount">0件</span></summary>
         <div id="weightLogList" class="tx-list"></div>
       </details>
+
+      <div class="section-heading">
+        <h2>目標体重</h2>
+      </div>
+      <form id="targetWeightForm" class="tx-form inline-form">
+        <label class="field">
+          <span>目標体重（任意）</span>
+          <div class="amount-input-wrap">
+            <input type="number" id="targetWeight" inputmode="decimal" step="0.1" min="0" placeholder="例）60.0" />
+            <span class="unit-suffix">kg</span>
+          </div>
+        </label>
+        <button type="submit" class="ghost-btn">保存</button>
+      </form>
     </section>
 
     <!-- 予算 -->
