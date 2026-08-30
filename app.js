@@ -523,6 +523,7 @@ function trendItemsByWeek(mk) {
 
 function renderBarColumns(wrap, items, sparse) {
   wrap.innerHTML = "";
+  wrap.classList.toggle("dense", sparse);
   const max = Math.max(1, ...items.map((it) => it.amt));
   items.forEach((it, i) => {
     const col = document.createElement("div");

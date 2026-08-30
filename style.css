@@ -619,9 +619,12 @@ html, body {
   border-radius: var(--radius);
   padding: 16px 12px 10px;
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
+.trend-chart.dense { gap: 2px; padding-left: 6px; padding-right: 6px; }
 .trend-col {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -636,6 +639,7 @@ html, body {
   display: flex;
   align-items: flex-end;
 }
+.trend-chart.dense .trend-bar-track { max-width: 8px; }
 .trend-bar-fill {
   width: 100%;
   background: var(--primary);
@@ -643,8 +647,9 @@ html, body {
   min-height: 2px;
 }
 .trend-col.current .trend-bar-fill { background: var(--primary-dark); }
-.trend-amt { font-size: 10.5px; color: var(--text-muted); font-weight: 600; }
-.trend-label { font-size: 11px; color: var(--text-muted); }
+.trend-amt { font-size: 10.5px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.trend-label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.trend-chart.dense .trend-label { font-size: 9px; }
 
 /* Budget view */
 .advice-detail-card {
