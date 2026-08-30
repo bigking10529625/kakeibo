@@ -486,7 +486,13 @@ function renderTrend() {
 // ---------- 体重管理 ----------
 function sortedWeightLogs(order) {
   const withIndex = state.weightLogs.map((w, i) => ({ ...w, _i: i }));
-  withIndex.sort((a, b) => (a.date !== b.date ? (a.date < b.date ? -1 : 1) : a._i - b._i));
+  withIndex.sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    const ah = a.hour ?? -1;
+    const bh = b.hour ?? -1;
+    if (ah !== bh) return ah - bh;
+    return a._i - b._i;
+  });
   return order === "desc" ? withIndex.reverse() : withIndex;
 }
 
@@ -494,8 +500,20 @@ function fmtFat(v) {
   return v !== null && v !== undefined && v !== "" ? `${v}%` : null;
 }
 
-// 日付文字列(YYYY-MM-DD)をタイムスタンプに変換
-const dateTs = (d) => new Date(d + "T00:00:00").getTime();
+function fmtHour(h) {
+  return h !== null && h !== undefined && h !== "" ? `${h}時` : "";
+}
+
+// 記録(date+hour)をタイムスタンプに変換。時刻未入力は0時扱い
+const pointTs = (p) => new Date(`${p.date}T${pad2(p.hour || 0)}:00:00`).getTime();
+
+const weightHourSelect = document.getElementById("weightHour");
+for (let h = 0; h <= 23; h++) {
+  const opt = document.createElement("option");
+  opt.value = h;
+  opt.textContent = `${h}時`;
+  weightHourSelect.appendChild(opt);
+}
 
 function makeScale(values, padFrac, top, bottom) {
   let min = Math.min(...values);
@@ -520,18 +538,18 @@ function buildWeightSvg(weightPoints, fatPoints, target) {
     labelY = 175,
     totalH = 192;
 
-  const allTs = weightPoints.map((p) => dateTs(p.date));
+  const allTs = weightPoints.map((p) => pointTs(p));
   const minTs = Math.min(...allTs);
   const maxTs = Math.max(...allTs);
-  const xOf = (date) => {
+  const xOf = (p) => {
     if (minTs === maxTs) return padX + (w - padX * 2) / 2;
-    return padX + ((dateTs(date) - minTs) / (maxTs - minTs)) * (w - padX * 2);
+    return padX + ((pointTs(p) - minTs) / (maxTs - minTs)) * (w - padX * 2);
   };
 
   const weightValues = weightPoints.map((p) => p.weight).concat(target ? [target] : []);
   const weightScale = makeScale(weightValues, 0.15, chartTop, chartH);
 
-  const wCoords = weightPoints.map((p) => [xOf(p.date), weightScale(p.weight)]);
+  const wCoords = weightPoints.map((p) => [xOf(p), weightScale(p.weight)]);
   const wLinePath = wCoords.map((c, i) => (i === 0 ? "M" : "L") + c[0].toFixed(1) + "," + c[1].toFixed(1)).join(" ");
   const wAreaPath = `${wLinePath} L${wCoords[wCoords.length - 1][0].toFixed(1)},${chartH} L${wCoords[0][0].toFixed(1)},${chartH} Z`;
   const lastIdx = wCoords.length - 1;
@@ -572,7 +590,7 @@ function buildWeightSvg(weightPoints, fatPoints, target) {
       chartTop,
       chartH
     );
-    const fCoords = fatPoints.map((p) => [xOf(p.date), fatScale(p.bodyFat)]);
+    const fCoords = fatPoints.map((p) => [xOf(p), fatScale(p.bodyFat)]);
     if (fCoords.length > 1) {
       const fLinePath = fCoords.map((c, i) => (i === 0 ? "M" : "L") + c[0].toFixed(1) + "," + c[1].toFixed(1)).join(" ");
       fatLine = `<path d="${fLinePath}" fill="none" stroke="#f59e0b" stroke-width="2.25" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round" />`;
@@ -654,7 +672,7 @@ function renderWeightLogList() {
       <div class="tx-emoji">⚖️</div>
       <div class="tx-main">
         <div class="tx-cat">${w.weight}kg${fat ? " ・ 体脂肪 " + fat : ""}</div>
-        <div class="tx-meta">${w.date}${w.memo ? " ・ " + escapeHtml(w.memo) : ""}</div>
+        <div class="tx-meta">${w.date}${fmtHour(w.hour) ? " " + fmtHour(w.hour) : ""}${w.memo ? " ・ " + escapeHtml(w.memo) : ""}</div>
       </div>
       <button class="tx-delete" data-id="${w.id}" aria-label="削除">✕</button>
     `;
@@ -738,6 +756,8 @@ function renderWeight() {
   document.getElementById("targetWeight").value = state.settings.targetWeight ?? "";
   const dateInput = document.getElementById("weightDate");
   dateInput.value = dateInput.value || new Date().toISOString().slice(0, 10);
+  const hourInput = document.getElementById("weightHour");
+  if (!hourInput.value) hourInput.value = new Date().getHours();
 
   const asc = sortedWeightLogs("asc");
   const desc = sortedWeightLogs("desc");
@@ -839,11 +859,13 @@ document.getElementById("weightForm").addEventListener("submit", (e) => {
   if (isNaN(weight) || weight <= 0) return;
   const fatRaw = document.getElementById("bodyFatInput").value;
   const bodyFat = fatRaw === "" ? null : parseFloat(fatRaw);
+  const hourRaw = document.getElementById("weightHour").value;
   const entry = {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     weight,
     bodyFat,
     date: document.getElementById("weightDate").value,
+    hour: hourRaw === "" ? null : parseInt(hourRaw, 10),
     memo: document.getElementById("weightMemo").value.trim(),
   };
   state.weightLogs.push(entry);
