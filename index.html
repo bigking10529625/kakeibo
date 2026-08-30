@@ -153,8 +153,14 @@
       <p id="analysisEmpty" class="empty-state" hidden>この期間の記録がありません。</p>
 
       <div class="section-heading">
-        <h2>月ごとの推移（直近6か月）</h2>
+        <h2>支出の推移</h2>
       </div>
+      <div class="range-pills" id="trendGranularityPills">
+        <button type="button" class="range-pill" data-gran="day">日別</button>
+        <button type="button" class="range-pill" data-gran="week">週別</button>
+        <button type="button" class="range-pill active" data-gran="month">月別</button>
+      </div>
+      <p class="trend-subtitle" id="trendSubtitle">直近6か月の合計支出</p>
       <div id="trendChart" class="trend-chart"></div>
     </section>
 

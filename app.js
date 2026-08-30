@@ -454,33 +454,105 @@ function renderAnalysisBody() {
     legend.appendChild(row);
   });
 }
-document.getElementById("analysisMonth").addEventListener("change", renderAnalysisBody);
+document.getElementById("analysisMonth").addEventListener("change", () => {
+  renderAnalysisBody();
+  renderTrend();
+});
 
-function renderTrend() {
-  const wrap = document.getElementById("trendChart");
-  wrap.innerHTML = "";
+// ---------- 支出の推移（日別・週別・月別） ----------
+let trendGranularity = "month";
+
+document.querySelectorAll("#trendGranularityPills .range-pill").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#trendGranularityPills .range-pill").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    trendGranularity = btn.dataset.gran;
+    renderTrend();
+  });
+});
+
+function trendItemsByMonth() {
   const now = new Date();
   const months = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({ key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`, label: `${d.getMonth() + 1}月` });
   }
-  const totals = months.map((m) =>
-    state.transactions.filter((t) => monthKey(t.date) === m.key).reduce((s, t) => s + t.amount, 0)
-  );
-  const max = Math.max(1, ...totals);
   const curKey = thisMonthKey();
-  months.forEach((m, i) => {
+  return months.map((m) => ({
+    label: m.label,
+    amt: state.transactions.filter((t) => monthKey(t.date) === m.key).reduce((s, t) => s + t.amount, 0),
+    current: m.key === curKey,
+  }));
+}
+
+function trendItemsByDay(mk) {
+  const [y, m] = mk.split("-").map(Number);
+  const days = daysInMonth(y, m - 1);
+  const monthTx = state.transactions.filter((t) => monthKey(t.date) === mk);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const items = [];
+  for (let d = 1; d <= days; d++) {
+    const dateStr = `${y}-${pad2(m)}-${pad2(d)}`;
+    const amt = monthTx.filter((t) => t.date === dateStr).reduce((s, t) => s + t.amount, 0);
+    items.push({ label: `${d}`, amt, current: dateStr === todayStr });
+  }
+  return items;
+}
+
+function trendItemsByWeek(mk) {
+  const [y, m] = mk.split("-").map(Number);
+  const days = daysInMonth(y, m - 1);
+  const monthTx = state.transactions.filter((t) => monthKey(t.date) === mk);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const items = [];
+  for (let start = 1; start <= days; start += 7) {
+    const end = Math.min(start + 6, days);
+    const amt = monthTx
+      .filter((t) => {
+        const d = parseInt(t.date.slice(8, 10), 10);
+        return d >= start && d <= end;
+      })
+      .reduce((s, t) => s + t.amount, 0);
+    const startStr = `${y}-${pad2(m)}-${pad2(start)}`;
+    const endStr = `${y}-${pad2(m)}-${pad2(end)}`;
+    items.push({ label: `${start}〜${end}日`, amt, current: todayStr >= startStr && todayStr <= endStr });
+  }
+  return items;
+}
+
+function renderBarColumns(wrap, items, sparse) {
+  wrap.innerHTML = "";
+  const max = Math.max(1, ...items.map((it) => it.amt));
+  items.forEach((it, i) => {
     const col = document.createElement("div");
-    col.className = "trend-col" + (m.key === curKey ? " current" : "");
-    const h = Math.round((totals[i] / max) * 100);
+    col.className = "trend-col" + (it.current ? " current" : "");
+    const h = Math.round((it.amt / max) * 100);
+    const showLabel = !sparse || i === 0 || i === items.length - 1 || (i + 1) % 5 === 0;
     col.innerHTML = `
-      <span class="trend-amt">${totals[i] > 0 ? Math.round(totals[i] / 1000) + "k" : ""}</span>
+      <span class="trend-amt">${it.amt > 0 && !sparse ? Math.round(it.amt / 1000) + "k" : ""}</span>
       <div class="trend-bar-track"><div class="trend-bar-fill" style="height:${h}%"></div></div>
-      <span class="trend-label">${m.label}</span>
+      <span class="trend-label">${showLabel ? it.label : ""}</span>
     `;
     wrap.appendChild(col);
   });
+}
+
+function renderTrend() {
+  const wrap = document.getElementById("trendChart");
+  const subtitleEl = document.getElementById("trendSubtitle");
+  const mk = document.getElementById("analysisMonth").value || thisMonthKey();
+
+  if (trendGranularity === "day") {
+    subtitleEl.textContent = `${monthLabel(mk)}の日ごとの支出`;
+    renderBarColumns(wrap, trendItemsByDay(mk), true);
+  } else if (trendGranularity === "week") {
+    subtitleEl.textContent = `${monthLabel(mk)}の週ごとの支出`;
+    renderBarColumns(wrap, trendItemsByWeek(mk), false);
+  } else {
+    subtitleEl.textContent = "直近6か月の合計支出";
+    renderBarColumns(wrap, trendItemsByMonth(), false);
+  }
 }
 
 // ---------- 体重管理 ----------
@@ -731,9 +803,9 @@ function filterByRange(asc, range) {
   return asc.filter((p) => txDate(p) >= cutoff);
 }
 
-document.querySelectorAll(".range-pill").forEach((btn) => {
+document.querySelectorAll("#weightRangePills .range-pill").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".range-pill").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll("#weightRangePills .range-pill").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     weightChartRange = btn.dataset.range;
     const monthSelect = document.getElementById("weightMonthSelect");

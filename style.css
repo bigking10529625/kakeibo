@@ -492,6 +492,7 @@ html, body {
   box-shadow: var(--shadow);
 }
 .range-pills { display: flex; gap: 8px; margin: 16px 4px 0; }
+.trend-subtitle { font-size: 12.5px; color: var(--text-muted); margin: 10px 4px 0; }
 .range-pill {
   flex: 1;
   text-align: center;
