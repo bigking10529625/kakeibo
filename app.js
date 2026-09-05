@@ -61,7 +61,7 @@ function renderMealSuggestions() {
   card.hidden = false;
 
   const cycle = getCurrentCycle();
-  const budget = state.settings.monthlyBudget || 0;
+  const budget = computedBudget(cycle) || 0;
   const txs = transactionsInCycle(cycle);
   const spent = txs.reduce((s, t) => s + t.amount, 0);
   const advice = buildAdvice(cycle, spent, budget);
@@ -110,11 +110,15 @@ document.getElementById("mealShuffleBtn").addEventListener("click", () => {
 const STORAGE_TX = "kakeibo_transactions";
 const STORAGE_SETTINGS = "kakeibo_settings";
 const STORAGE_WEIGHT = "kakeibo_weight_logs";
+const STORAGE_INCOME = "kakeibo_income";
+const STORAGE_FIXED_COSTS = "kakeibo_fixed_costs";
 
 const state = {
   transactions: loadTransactions(),
   settings: loadSettings(),
   weightLogs: loadWeightLogs(),
+  income: loadIncome(),
+  fixedCosts: loadFixedCosts(),
   ocrAmountGuess: null,
 };
 
@@ -133,9 +137,9 @@ function saveTransactions() {
 function loadSettings() {
   try {
     const raw = localStorage.getItem(STORAGE_SETTINGS);
-    return raw ? JSON.parse(raw) : { monthlyBudget: null, paydayDay: 25 };
+    return raw ? JSON.parse(raw) : { paydayDay: 25 };
   } catch {
-    return { monthlyBudget: null, paydayDay: 25 };
+    return { paydayDay: 25 };
   }
 }
 function saveSettings() {
@@ -151,6 +155,28 @@ function loadWeightLogs() {
 }
 function saveWeightLogs() {
   localStorage.setItem(STORAGE_WEIGHT, JSON.stringify(state.weightLogs));
+}
+function loadIncome() {
+  try {
+    const raw = localStorage.getItem(STORAGE_INCOME);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+function saveIncome() {
+  localStorage.setItem(STORAGE_INCOME, JSON.stringify(state.income));
+}
+function loadFixedCosts() {
+  try {
+    const raw = localStorage.getItem(STORAGE_FIXED_COSTS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+function saveFixedCosts() {
+  localStorage.setItem(STORAGE_FIXED_COSTS, JSON.stringify(state.fixedCosts));
 }
 
 // ---------- 日付ユーティリティ ----------
@@ -209,6 +235,24 @@ function transactionsInCycle(cycle) {
   });
 }
 
+// ---------- 給料・固定費（予算の自動計算） ----------
+function cycleIncomeKey(cycle) {
+  return cycle.cycleStart.toISOString().slice(0, 10);
+}
+function totalFixedCosts() {
+  return state.fixedCosts.reduce((s, f) => s + f.amount, 0);
+}
+function currentCycleIncome(cycle) {
+  const v = state.income[cycleIncomeKey(cycle)];
+  return v === undefined ? null : v;
+}
+// そのサイクルの予算（給料 − 固定費）。給料が未入力なら null
+function computedBudget(cycle) {
+  const income = currentCycleIncome(cycle);
+  if (income === null) return null;
+  return income - totalFixedCosts();
+}
+
 // ---------- フォーマット ----------
 const yen = (n) => "¥" + Math.round(n).toLocaleString("ja-JP");
 
@@ -242,12 +286,20 @@ function showToast(msg) {
 
 // ---------- アドバイス生成 ----------
 function buildAdvice(cycle, spent, budget) {
+  if (budget === null || budget === undefined) {
+    return { icon: "❓", text: "まずは今月の給料と固定費を入力してください。", dailyAllowance: 0, remaining: 0 };
+  }
   const remaining = budget - spent;
   const dailyAllowance = remaining / cycle.daysLeft;
   const basePace = budget / cycle.totalCycleDays;
 
   if (budget <= 0) {
-    return { icon: "❓", text: "まずは今月の予算を設定してください。", dailyAllowance, remaining };
+    return {
+      icon: "😱",
+      text: `固定費が給料を${yen(-budget)}上回っています。固定費の見直しが必要かもしれません。`,
+      dailyAllowance,
+      remaining,
+    };
   }
   if (remaining <= 0) {
     return {
@@ -286,18 +338,19 @@ function renderHome() {
   const cycle = getCurrentCycle();
   const txs = transactionsInCycle(cycle).sort((a, b) => (a.date < b.date ? 1 : -1));
   const spent = txs.reduce((s, t) => s + t.amount, 0);
-  const budget = state.settings.monthlyBudget || 0;
-  const remaining = budget - spent;
+  const budget = computedBudget(cycle);
+  const hasBudget = budget !== null;
+  const remaining = (budget ?? 0) - spent;
 
   document.getElementById("homeDaysLeft").textContent = `給料日まで ${cycle.daysLeft} 日`;
-  document.getElementById("homeRemaining").textContent = budget > 0 ? yen(remaining) : "予算未設定";
+  document.getElementById("homeRemaining").textContent = hasBudget ? yen(remaining) : "予算未設定";
   document.getElementById("homeSpent").textContent = `使った ${yen(spent)}`;
-  document.getElementById("homeBudget").textContent = `予算 ${budget > 0 ? yen(budget) : "--"}`;
+  document.getElementById("homeBudget").textContent = `予算 ${hasBudget ? yen(budget) : "--"}`;
 
   const fill = document.getElementById("homeProgressFill");
-  const pct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
+  const pct = hasBudget && budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
   fill.style.width = pct + "%";
-  fill.classList.toggle("over", budget > 0 && spent > budget);
+  fill.classList.toggle("over", hasBudget && spent > budget);
 
   const advice = buildAdvice(cycle, spent, budget);
   document.getElementById("homeAdviceIcon").textContent = advice.icon;
@@ -958,16 +1011,61 @@ for (let d = 1; d <= 31; d++) {
   paydaySelect.appendChild(opt);
 }
 
+function renderFixedCostList() {
+  const listEl = document.getElementById("fixedCostList");
+  const emptyEl = document.getElementById("fixedCostEmpty");
+  listEl.innerHTML = "";
+  if (state.fixedCosts.length === 0) {
+    emptyEl.hidden = false;
+    return;
+  }
+  emptyEl.hidden = true;
+  state.fixedCosts.forEach((f) => {
+    const row = document.createElement("div");
+    row.className = "tx-row";
+    row.innerHTML = `
+      <div class="tx-emoji">📌</div>
+      <div class="tx-main">
+        <div class="tx-cat">${escapeHtml(f.name)}</div>
+      </div>
+      <div class="tx-amount">${yen(f.amount)}</div>
+      <button class="tx-delete" data-id="${f.id}" aria-label="削除">✕</button>
+    `;
+    listEl.appendChild(row);
+  });
+  listEl.querySelectorAll(".tx-delete").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.fixedCosts = state.fixedCosts.filter((f) => f.id !== btn.dataset.id);
+      saveFixedCosts();
+      renderBudget();
+      renderHome();
+      showToast("削除しました");
+    });
+  });
+}
+
 function renderBudget() {
-  document.getElementById("monthlyBudget").value = state.settings.monthlyBudget || "";
   paydaySelect.value = state.settings.paydayDay || 25;
   document.getElementById("dietModeToggle").checked = !!state.settings.dietMode;
 
-  const budget = state.settings.monthlyBudget || 0;
+  const cycle = getCurrentCycle();
+  const currentIncome = currentCycleIncome(cycle);
+  document.getElementById("incomeInput").value = currentIncome !== null ? currentIncome : "";
+
+  renderFixedCostList();
+  const fixedTotal = totalFixedCosts();
+  document.getElementById("fixedCostTotalRow").hidden = state.fixedCosts.length === 0;
+  document.getElementById("fixedCostTotal").textContent = yen(fixedTotal);
+
+  const budget = computedBudget(cycle);
+  document.getElementById("computedBudgetValue").textContent = budget === null ? "未設定" : yen(budget);
+  document.getElementById("computedBudgetIncome").textContent = currentIncome !== null ? `給料 ${yen(currentIncome)}` : "給料 ¥--";
+  document.getElementById("computedBudgetFixed").textContent = `固定費 ${yen(fixedTotal)}`;
+
   const emptyEl = document.getElementById("budgetAdviceEmpty");
   const bodyEl = document.getElementById("budgetAdviceBody");
 
-  if (!budget) {
+  if (budget === null) {
     emptyEl.hidden = false;
     bodyEl.hidden = true;
     return;
@@ -975,7 +1073,6 @@ function renderBudget() {
   emptyEl.hidden = true;
   bodyEl.hidden = false;
 
-  const cycle = getCurrentCycle();
   const txs = transactionsInCycle(cycle);
   const spent = txs.reduce((s, t) => s + t.amount, 0);
   const advice = buildAdvice(cycle, spent, budget);
@@ -987,17 +1084,49 @@ function renderBudget() {
   document.getElementById("budgetAdviceText").textContent = advice.text;
 }
 
-document.getElementById("budgetForm").addEventListener("submit", (e) => {
+document.getElementById("paydayForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  const budget = parseInt(document.getElementById("monthlyBudget").value, 10);
-  const payday = parseInt(paydaySelect.value, 10);
-  if (isNaN(budget) || budget < 0) return;
-  state.settings.monthlyBudget = budget;
-  state.settings.paydayDay = payday;
+  state.settings.paydayDay = parseInt(paydaySelect.value, 10);
   state.settings.dietMode = document.getElementById("dietModeToggle").checked;
   saveSettings();
   renderBudget();
-  showToast("予算を保存しました");
+  renderHome();
+  showToast("保存しました");
+});
+
+document.getElementById("incomeForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const raw = document.getElementById("incomeInput").value;
+  const amount = raw === "" ? null : parseInt(raw, 10);
+  if (amount !== null && (isNaN(amount) || amount < 0)) return;
+  const cycle = getCurrentCycle();
+  const key = cycleIncomeKey(cycle);
+  if (amount === null) {
+    delete state.income[key];
+  } else {
+    state.income[key] = amount;
+  }
+  saveIncome();
+  renderBudget();
+  renderHome();
+  showToast("給料を保存しました");
+});
+
+document.getElementById("fixedCostForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const name = document.getElementById("fixedCostName").value.trim();
+  const amount = parseInt(document.getElementById("fixedCostAmount").value, 10);
+  if (!name || isNaN(amount) || amount <= 0) return;
+  state.fixedCosts.push({
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+    name,
+    amount,
+  });
+  saveFixedCosts();
+  document.getElementById("fixedCostForm").reset();
+  renderBudget();
+  renderHome();
+  showToast("固定費を追加しました");
 });
 
 // ---------- データの引っ越し・バックアップ ----------
@@ -1006,6 +1135,8 @@ document.getElementById("exportDataBtn").addEventListener("click", () => {
     transactions: state.transactions,
     settings: state.settings,
     weightLogs: state.weightLogs,
+    income: state.income,
+    fixedCosts: state.fixedCosts,
     exportedAt: new Date().toISOString(),
   });
   const box = document.getElementById("exportBox");
@@ -1042,11 +1173,15 @@ document.getElementById("importDataBtn").addEventListener("click", () => {
   if (!confirm("現在このページにあるデータを、貼り付けた内容で上書きします。よろしいですか？")) return;
 
   state.transactions = Array.isArray(data.transactions) ? data.transactions : [];
-  state.settings = data.settings && typeof data.settings === "object" ? data.settings : { monthlyBudget: null, paydayDay: 25 };
+  state.settings = data.settings && typeof data.settings === "object" ? data.settings : { paydayDay: 25 };
   state.weightLogs = Array.isArray(data.weightLogs) ? data.weightLogs : [];
+  state.income = data.income && typeof data.income === "object" ? data.income : {};
+  state.fixedCosts = Array.isArray(data.fixedCosts) ? data.fixedCosts : [];
   saveTransactions();
   saveSettings();
   saveWeightLogs();
+  saveIncome();
+  saveFixedCosts();
   document.getElementById("importTextarea").value = "";
   document.getElementById("importBox").hidden = true;
   showToast("読み込みました");
@@ -1056,11 +1191,15 @@ document.getElementById("importDataBtn").addEventListener("click", () => {
 document.getElementById("resetDataBtn").addEventListener("click", () => {
   if (confirm("すべての記録と設定を削除します。よろしいですか？")) {
     state.transactions = [];
-    state.settings = { monthlyBudget: null, paydayDay: 25 };
+    state.settings = { paydayDay: 25 };
     state.weightLogs = [];
+    state.income = {};
+    state.fixedCosts = [];
     saveTransactions();
     saveSettings();
     saveWeightLogs();
+    saveIncome();
+    saveFixedCosts();
     renderBudget();
     showToast("データを削除しました");
   }

@@ -260,16 +260,9 @@
     <!-- 予算 -->
     <section id="view-budget" class="view">
       <div class="section-heading">
-        <h2>予算設定</h2>
+        <h2>給料日</h2>
       </div>
-      <form id="budgetForm" class="tx-form">
-        <label class="field">
-          <span>今月の予算</span>
-          <div class="amount-input-wrap">
-            <span class="yen">¥</span>
-            <input type="number" id="monthlyBudget" inputmode="numeric" min="0" required />
-          </div>
-        </label>
+      <form id="paydayForm" class="tx-form">
         <label class="field">
           <span>給料日（毎月）</span>
           <select id="paydayDay"></select>
@@ -278,8 +271,58 @@
           <input type="checkbox" id="dietModeToggle" />
           <span>🥗 ダイエット中 - ホームにごはん提案を表示する</span>
         </label>
-        <button type="submit" class="primary-btn">保存する</button>
+        <button type="submit" class="ghost-btn">保存</button>
       </form>
+
+      <div class="section-heading">
+        <h2>今月の給料</h2>
+      </div>
+      <form id="incomeForm" class="tx-form inline-form">
+        <label class="field">
+          <span>今サイクルの給料</span>
+          <div class="amount-input-wrap">
+            <span class="yen">¥</span>
+            <input type="number" id="incomeInput" inputmode="numeric" min="0" placeholder="例）250000" />
+          </div>
+        </label>
+        <button type="submit" class="ghost-btn">保存</button>
+      </form>
+
+      <div class="section-heading">
+        <h2>固定費（毎月自動で引き継がれます）</h2>
+      </div>
+      <form id="fixedCostForm" class="tx-form inline-form">
+        <label class="field">
+          <span>項目名</span>
+          <input type="text" id="fixedCostName" placeholder="例）家賃" />
+        </label>
+        <label class="field">
+          <span>金額</span>
+          <div class="amount-input-wrap">
+            <span class="yen">¥</span>
+            <input type="number" id="fixedCostAmount" inputmode="numeric" min="0" />
+          </div>
+        </label>
+        <button type="submit" class="ghost-btn">追加</button>
+      </form>
+      <div id="fixedCostList" class="tx-list"></div>
+      <p id="fixedCostEmpty" class="empty-state" hidden>固定費はまだ登録されていません。家賃や通信費などを追加してみましょう。</p>
+      <div class="fixed-cost-total-row" id="fixedCostTotalRow" hidden>
+        <span>固定費合計</span>
+        <span id="fixedCostTotal">¥0</span>
+      </div>
+
+      <div class="section-heading">
+        <h2>今月の予算（給料 − 固定費）</h2>
+      </div>
+      <div class="computed-budget-card">
+        <span class="advice-stat-label">今サイクルの予算</span>
+        <span class="computed-budget-value" id="computedBudgetValue">未設定</span>
+        <div class="computed-budget-breakdown">
+          <span id="computedBudgetIncome">給料 ¥--</span>
+          <span id="computedBudgetFixed">固定費 ¥--</span>
+        </div>
+      </div>
 
       <div class="section-heading">
         <h2>給料日までの過ごし方</h2>
