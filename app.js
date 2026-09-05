@@ -411,7 +411,7 @@ function renderHome() {
         <div class="tx-emoji">${c.emoji}</div>
         <div class="tx-main">
           <div class="tx-cat">${c.label}${t.mealType && MEAL_TYPES[t.mealType] ? " ・ " + MEAL_TYPES[t.mealType] : ""}</div>
-          <div class="tx-meta">${t.date}${t.memo ? " ・ " + escapeHtml(t.memo) : ""}</div>
+          <div class="tx-meta">${t.date}${t.place ? " ・ 📍" + escapeHtml(t.place) : ""}${t.memo ? " ・ " + escapeHtml(t.memo) : ""}</div>
         </div>
         <div class="tx-amount">${yen(t.amount)}</div>
         <button class="tx-delete" data-id="${t.id}" aria-label="削除">✕</button>
@@ -545,7 +545,7 @@ function renderAnalysisBody() {
         .map(
           (t) => `
         <div class="legend-detail-item" data-id="${t.id}">
-          <span class="legend-detail-meta">${t.date}${t.mealType && MEAL_TYPES[t.mealType] ? " ・ " + MEAL_TYPES[t.mealType] : ""}${t.memo ? " ・ " + escapeHtml(t.memo) : ""}</span>
+          <span class="legend-detail-meta">${t.date}${t.mealType && MEAL_TYPES[t.mealType] ? " ・ " + MEAL_TYPES[t.mealType] : ""}${t.place ? " ・ 📍" + escapeHtml(t.place) : ""}${t.memo ? " ・ " + escapeHtml(t.memo) : ""}</span>
           <span class="legend-detail-amt">${yen(t.amount)}</span>
         </div>`
         )
@@ -1382,12 +1382,13 @@ function startEditTx(tx) {
   document.getElementById("txCategory").value = tx.category;
   document.getElementById("txMealTypeField").hidden = tx.category !== "food";
   document.getElementById("txMealType").value = tx.mealType || "";
+  document.getElementById("txPlace").value = tx.place || "";
   document.getElementById("txDate").value = tx.date;
   document.getElementById("txMemo").value = tx.memo || "";
 }
 
 document.getElementById("manualAddBtn").addEventListener("click", () => {
-  openFormForEntry({ amount: "", date: null, rawText: "", candidates: [] });
+  openFormForEntry({ amount: "", date: null, place: null, rawText: "", candidates: [] });
 });
 
 photoInput.addEventListener("change", async () => {
@@ -1408,28 +1409,31 @@ photoInput.addEventListener("change", async () => {
     const candidates = getAmountCandidates(text);
     const amount = candidates.length ? candidates[0].num : null;
     const date = extractDate(text);
+    const place = extractPlace(text);
     ocrStatus.hidden = true;
-    openFormForEntry({ amount: amount || "", date, rawText: text, candidates });
-    if (amount && date) {
-      showToast(`${yen(amount)} ・ ${date} を読み取りました`);
+    openFormForEntry({ amount: amount || "", date, place, rawText: text, candidates });
+    const parts = [amount ? yen(amount) : null, date, place ? `📍${place}` : null].filter(Boolean);
+    if (parts.length > 0) {
+      showToast(`${parts.join(" ・ ")} を読み取りました`);
     } else {
-      showToast(`${amount ? "" : "金額"}${!amount && !date ? "・" : ""}${date ? "" : "日付"}を自動検出できませんでした`);
+      showToast("自動検出できませんでした。手入力してください");
     }
   } catch (err) {
     console.error(err);
     ocrStatus.hidden = true;
-    openFormForEntry({ amount: "", date: null, rawText: "", candidates: [] });
+    openFormForEntry({ amount: "", date: null, place: null, rawText: "", candidates: [] });
     showToast("読み取りに失敗しました。手入力してください");
   }
 });
 
-function openFormForEntry({ amount, date, rawText, candidates }) {
+function openFormForEntry({ amount, date, place, rawText, candidates }) {
   txForm.hidden = false;
   document.getElementById("txAmount").value = amount;
   document.getElementById("txDate").value = date || new Date().toISOString().slice(0, 10);
   document.getElementById("txCategory").value = "food";
   document.getElementById("txMealTypeField").hidden = false;
   document.getElementById("txMealType").value = "";
+  document.getElementById("txPlace").value = place || "";
   document.getElementById("txMemo").value = "";
   const rawWrap = document.getElementById("ocrRawWrap");
   if (rawText) {
@@ -1475,6 +1479,7 @@ txForm.addEventListener("submit", (e) => {
   if (isNaN(amount) || amount <= 0) return;
   const category = document.getElementById("txCategory").value;
   const mealTypeRaw = document.getElementById("txMealType").value;
+  const place = document.getElementById("txPlace").value.trim();
   const date = document.getElementById("txDate").value;
   const memo = document.getElementById("txMemo").value.trim();
   const mealType = category === "food" && mealTypeRaw ? mealTypeRaw : null;
@@ -1485,6 +1490,7 @@ txForm.addEventListener("submit", (e) => {
       tx.amount = amount;
       tx.category = category;
       tx.mealType = mealType;
+      tx.place = place;
       tx.date = date;
       tx.memo = memo;
     }
@@ -1500,6 +1506,7 @@ txForm.addEventListener("submit", (e) => {
     amount,
     category,
     mealType,
+    place,
     date,
     memo,
   };
@@ -1618,6 +1625,23 @@ function getAmountCandidates(text) {
 function extractAmount(text) {
   const candidates = getAmountCandidates(text);
   return candidates.length ? candidates[0].num : null;
+}
+
+// レシートの一番上あたりにある店名らしき行を推測する（見つからなければnull）
+function extractPlace(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  const skipPattern = /^[\d\s\-\/:：.,、円¥ー―~〒]*$/;
+  const noisePattern = /^(領収書|レシート|receipt|no\.?|tel|電話|〒|合計|小計|総合計|御会計|お会計|消費税|お預かり|お釣り)/i;
+  for (const line of lines.slice(0, 5)) {
+    if (line.length < 2 || line.length > 20) continue;
+    if (skipPattern.test(line)) continue;
+    if (noisePattern.test(line)) continue;
+    return line;
+  }
+  return null;
 }
 
 // レシートの文字列から日付を読み取り、"YYYY-MM-DD" 形式で返す（見つからなければ null）
