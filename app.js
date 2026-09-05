@@ -239,6 +239,17 @@ function transactionsInCycle(cycle) {
 function cycleIncomeKey(cycle) {
   return cycle.cycleStart.toISOString().slice(0, 10);
 }
+// 現在のサイクルからoffset分ずれたサイクル（給料の過去入力・先入力用）
+function cycleAtOffset(offsetMonths) {
+  const payDay = state.settings.paydayDay || 25;
+  const base = getCurrentCycle();
+  const ym = addMonths(base.cycleStart.getFullYear(), base.cycleStart.getMonth(), offsetMonths);
+  const cycleStart = paydayDateFor(ym.year, ym.month, payDay);
+  const nm = addMonths(ym.year, ym.month, 1);
+  const nextPayday = paydayDateFor(nm.year, nm.month, payDay);
+  return { cycleStart, nextPayday };
+}
+const fmtDateShort = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
 function totalFixedCosts() {
   return state.fixedCosts.reduce((s, f) => s + f.amount, 0);
 }
@@ -399,7 +410,7 @@ function renderHome() {
       row.innerHTML = `
         <div class="tx-emoji">${c.emoji}</div>
         <div class="tx-main">
-          <div class="tx-cat">${c.label}</div>
+          <div class="tx-cat">${c.label}${t.mealType && MEAL_TYPES[t.mealType] ? " ・ " + MEAL_TYPES[t.mealType] : ""}</div>
           <div class="tx-meta">${t.date}${t.memo ? " ・ " + escapeHtml(t.memo) : ""}</div>
         </div>
         <div class="tx-amount">${yen(t.amount)}</div>
@@ -1044,13 +1055,39 @@ function renderFixedCostList() {
   });
 }
 
+// 給料入力欄で選べるサイクル一覧（過去11回分＋今回＋先2回分）を作る
+function populateIncomeCycleSelect() {
+  const sel = document.getElementById("incomeCycleSelect");
+  const prevValue = sel.value;
+  sel.innerHTML = "";
+  for (let offset = -11; offset <= 2; offset++) {
+    const c = cycleAtOffset(offset);
+    const endDate = new Date(c.nextPayday.getTime() - 86400000);
+    const label = `${fmtDateShort(c.cycleStart)}〜${fmtDateShort(endDate)}${offset === 0 ? "（今回）" : ""}`;
+    const opt = document.createElement("option");
+    opt.value = offset;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  }
+  sel.value = prevValue !== "" && Array.from(sel.options).some((o) => o.value === prevValue) ? prevValue : "0";
+}
+
+function renderIncomeFormForSelectedCycle() {
+  const offset = parseInt(document.getElementById("incomeCycleSelect").value || "0", 10);
+  const cycle = cycleAtOffset(offset);
+  const income = state.income[cycleIncomeKey(cycle)];
+  document.getElementById("incomeInput").value = income !== undefined ? income : "";
+}
+document.getElementById("incomeCycleSelect").addEventListener("change", renderIncomeFormForSelectedCycle);
+
 function renderBudget() {
   paydaySelect.value = state.settings.paydayDay || 25;
   document.getElementById("dietModeToggle").checked = !!state.settings.dietMode;
 
   const cycle = getCurrentCycle();
   const currentIncome = currentCycleIncome(cycle);
-  document.getElementById("incomeInput").value = currentIncome !== null ? currentIncome : "";
+  populateIncomeCycleSelect();
+  renderIncomeFormForSelectedCycle();
 
   renderFixedCostList();
   const fixedTotal = totalFixedCosts();
@@ -1099,7 +1136,8 @@ document.getElementById("incomeForm").addEventListener("submit", (e) => {
   const raw = document.getElementById("incomeInput").value;
   const amount = raw === "" ? null : parseInt(raw, 10);
   if (amount !== null && (isNaN(amount) || amount < 0)) return;
-  const cycle = getCurrentCycle();
+  const offset = parseInt(document.getElementById("incomeCycleSelect").value || "0", 10);
+  const cycle = cycleAtOffset(offset);
   const key = cycleIncomeKey(cycle);
   if (amount === null) {
     delete state.income[key];
@@ -1214,6 +1252,16 @@ CATEGORIES.forEach((c) => {
   categorySelect.appendChild(opt);
 });
 
+const MEAL_TYPES = {
+  breakfast: "🌅 朝ごはん",
+  lunch: "☀️ 昼ごはん",
+  dinner: "🌙 夜ごはん",
+  other: "🍪 その他",
+};
+categorySelect.addEventListener("change", () => {
+  document.getElementById("txMealTypeField").hidden = categorySelect.value !== "food";
+});
+
 const photoInput = document.getElementById("photoInput");
 const receiptPreview = document.getElementById("receiptPreview");
 const ocrStatus = document.getElementById("ocrStatus");
@@ -1275,6 +1323,8 @@ function openFormForEntry({ amount, date, rawText, candidates }) {
   document.getElementById("txAmount").value = amount;
   document.getElementById("txDate").value = date || new Date().toISOString().slice(0, 10);
   document.getElementById("txCategory").value = "food";
+  document.getElementById("txMealTypeField").hidden = false;
+  document.getElementById("txMealType").value = "";
   document.getElementById("txMemo").value = "";
   const rawWrap = document.getElementById("ocrRawWrap");
   if (rawText) {
@@ -1318,10 +1368,13 @@ txForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const amount = parseInt(document.getElementById("txAmount").value, 10);
   if (isNaN(amount) || amount <= 0) return;
+  const category = document.getElementById("txCategory").value;
+  const mealTypeRaw = document.getElementById("txMealType").value;
   const tx = {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     amount,
-    category: document.getElementById("txCategory").value,
+    category,
+    mealType: category === "food" && mealTypeRaw ? mealTypeRaw : null,
     date: document.getElementById("txDate").value,
     memo: document.getElementById("txMemo").value.trim(),
   };
