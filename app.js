@@ -416,6 +416,7 @@ function renderHome() {
         <div class="tx-amount">${yen(t.amount)}</div>
         <button class="tx-delete" data-id="${t.id}" aria-label="削除">✕</button>
       `;
+      row.querySelector(".tx-main").addEventListener("click", () => startEditTx(t));
       listEl.appendChild(row);
     });
     listEl.querySelectorAll(".tx-delete").forEach((btn) => {
@@ -543,7 +544,7 @@ function renderAnalysisBody() {
       const itemsHtml = catTxs
         .map(
           (t) => `
-        <div class="legend-detail-item">
+        <div class="legend-detail-item" data-id="${t.id}">
           <span class="legend-detail-meta">${t.date}${t.mealType && MEAL_TYPES[t.mealType] ? " ・ " + MEAL_TYPES[t.mealType] : ""}${t.memo ? " ・ " + escapeHtml(t.memo) : ""}</span>
           <span class="legend-detail-amt">${yen(t.amount)}</span>
         </div>`
@@ -553,6 +554,12 @@ function renderAnalysisBody() {
       const detail = document.createElement("div");
       detail.className = "legend-detail";
       detail.innerHTML = mealHtml + `<div class="legend-detail-list">${itemsHtml}</div>`;
+      detail.querySelectorAll(".legend-detail-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          const t = catTxs.find((tx) => tx.id === el.dataset.id);
+          if (t) startEditTx(t);
+        });
+      });
       legend.appendChild(detail);
     }
   });
@@ -1301,13 +1308,54 @@ categorySelect.addEventListener("change", () => {
   document.getElementById("txMealTypeField").hidden = categorySelect.value !== "food";
 });
 
+// メモの文字列から食事の種類を推測する（一致しなければnull＝スルー）
+const MEAL_TYPE_KEYWORDS = {
+  breakfast: ["朝ごはん", "朝ご飯", "朝食", "モーニング"],
+  lunch: ["昼ごはん", "昼ご飯", "昼食", "ランチ"],
+  dinner: ["夜ごはん", "夜ご飯", "夕ごはん", "夕ご飯", "夕食", "晩ごはん", "晩ご飯", "ディナー"],
+};
+function guessMealTypeFromMemo(memo) {
+  if (!memo) return null;
+  for (const [type, keywords] of Object.entries(MEAL_TYPE_KEYWORDS)) {
+    if (keywords.some((kw) => memo.includes(kw))) return type;
+  }
+  return null;
+}
+
+document.getElementById("autoClassifyMealBtn").addEventListener("click", () => {
+  let matched = 0;
+  let skipped = 0;
+  state.transactions.forEach((t) => {
+    if (t.category !== "food" || t.mealType) return;
+    const guess = guessMealTypeFromMemo(t.memo);
+    if (guess) {
+      t.mealType = guess;
+      matched++;
+    } else {
+      skipped++;
+    }
+  });
+  if (matched > 0) saveTransactions();
+  renderHome();
+  showToast(`${matched}件を分類しました（${skipped}件は分類できず未設定のまま）`);
+});
+
 const photoInput = document.getElementById("photoInput");
 const receiptPreview = document.getElementById("receiptPreview");
 const ocrStatus = document.getElementById("ocrStatus");
 const ocrStatusText = document.getElementById("ocrStatusText");
 const txForm = document.getElementById("txForm");
+const txSubmitBtn = txForm.querySelector('button[type="submit"]');
+const captureCard = document.querySelector(".capture-card");
+const manualAddBtn = document.getElementById("manualAddBtn");
+
+let editingTxId = null;
 
 function resetAddForm() {
+  editingTxId = null;
+  captureCard.hidden = false;
+  manualAddBtn.hidden = false;
+  txSubmitBtn.textContent = "記録する";
   photoInput.value = "";
   receiptPreview.hidden = true;
   receiptPreview.src = "";
@@ -1318,6 +1366,24 @@ function resetAddForm() {
   document.getElementById("amountCandidates").hidden = true;
   document.getElementById("amountCandidates").innerHTML = "";
   txForm.reset();
+}
+
+// 既存の記録を編集モードで開く
+function startEditTx(tx) {
+  showView("add"); // 内部でresetAddForm()が走るため、editingTxIdの設定はこの後に行う
+  editingTxId = tx.id;
+  captureCard.hidden = true;
+  manualAddBtn.hidden = true;
+  document.getElementById("ocrRawWrap").hidden = true;
+  document.getElementById("amountCandidates").hidden = true;
+  txForm.hidden = false;
+  txSubmitBtn.textContent = "更新する";
+  document.getElementById("txAmount").value = tx.amount;
+  document.getElementById("txCategory").value = tx.category;
+  document.getElementById("txMealTypeField").hidden = tx.category !== "food";
+  document.getElementById("txMealType").value = tx.mealType || "";
+  document.getElementById("txDate").value = tx.date;
+  document.getElementById("txMemo").value = tx.memo || "";
 }
 
 document.getElementById("manualAddBtn").addEventListener("click", () => {
@@ -1409,13 +1475,33 @@ txForm.addEventListener("submit", (e) => {
   if (isNaN(amount) || amount <= 0) return;
   const category = document.getElementById("txCategory").value;
   const mealTypeRaw = document.getElementById("txMealType").value;
+  const date = document.getElementById("txDate").value;
+  const memo = document.getElementById("txMemo").value.trim();
+  const mealType = category === "food" && mealTypeRaw ? mealTypeRaw : null;
+
+  if (editingTxId) {
+    const tx = state.transactions.find((t) => t.id === editingTxId);
+    if (tx) {
+      tx.amount = amount;
+      tx.category = category;
+      tx.mealType = mealType;
+      tx.date = date;
+      tx.memo = memo;
+    }
+    saveTransactions();
+    resetAddForm();
+    showToast("更新しました");
+    showView("home");
+    return;
+  }
+
   const tx = {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     amount,
     category,
-    mealType: category === "food" && mealTypeRaw ? mealTypeRaw : null,
-    date: document.getElementById("txDate").value,
-    memo: document.getElementById("txMemo").value.trim(),
+    mealType,
+    date,
+    memo,
   };
   state.transactions.push(tx);
   saveTransactions();
