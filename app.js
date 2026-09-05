@@ -465,6 +465,8 @@ function renderAnalysis() {
   renderTrend();
 }
 
+let analysisExpandedCategory = null;
+
 function renderAnalysisBody() {
   const mk = document.getElementById("analysisMonth").value || thisMonthKey();
   const txs = state.transactions.filter((t) => monthKey(t.date) === mk);
@@ -507,15 +509,52 @@ function renderAnalysisBody() {
   sorted.forEach(([id, amt]) => {
     const c = catById(id);
     const pct = Math.round((amt / total) * 1000) / 10;
+    const isOpen = analysisExpandedCategory === id;
     const row = document.createElement("div");
-    row.className = "legend-row";
+    row.className = "legend-row" + (isOpen ? " open" : "");
     row.innerHTML = `
       <span class="legend-dot" style="background:${c.color}"></span>
       <span class="legend-name">${c.emoji} ${c.label}</span>
       <span class="legend-pct">${pct}%</span>
       <span class="legend-amt">${yen(amt)}</span>
+      <span class="legend-caret">${isOpen ? "▴" : "▾"}</span>
     `;
+    row.addEventListener("click", () => {
+      analysisExpandedCategory = isOpen ? null : id;
+      renderAnalysisBody();
+    });
     legend.appendChild(row);
+
+    if (isOpen) {
+      const catTxs = txs.filter((t) => t.category === id).sort((a, b) => (a.date < b.date ? 1 : -1));
+
+      let mealHtml = "";
+      if (id === "food") {
+        const mealTotals = {};
+        catTxs.forEach((t) => {
+          const k = t.mealType || "none";
+          mealTotals[k] = (mealTotals[k] || 0) + t.amount;
+        });
+        mealHtml = `<div class="legend-meal-breakdown">${Object.entries(mealTotals)
+          .map(([k, v]) => `<span class="legend-meal-chip">${k === "none" ? "未選択" : MEAL_TYPES[k]} ${yen(v)}</span>`)
+          .join("")}</div>`;
+      }
+
+      const itemsHtml = catTxs
+        .map(
+          (t) => `
+        <div class="legend-detail-item">
+          <span class="legend-detail-meta">${t.date}${t.mealType && MEAL_TYPES[t.mealType] ? " ・ " + MEAL_TYPES[t.mealType] : ""}${t.memo ? " ・ " + escapeHtml(t.memo) : ""}</span>
+          <span class="legend-detail-amt">${yen(t.amount)}</span>
+        </div>`
+        )
+        .join("");
+
+      const detail = document.createElement("div");
+      detail.className = "legend-detail";
+      detail.innerHTML = mealHtml + `<div class="legend-detail-list">${itemsHtml}</div>`;
+      legend.appendChild(detail);
+    }
   });
 }
 document.getElementById("analysisMonth").addEventListener("change", () => {
