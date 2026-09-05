@@ -1299,9 +1299,9 @@ CATEGORIES.forEach((c) => {
 });
 
 const MEAL_TYPES = {
-  breakfast: "🌅 朝ごはん",
-  lunch: "☀️ 昼ごはん",
-  dinner: "🌙 夜ごはん",
+  breakfast: "🌅 朝食",
+  lunch: "☀️ 昼食",
+  dinner: "🌙 夕食",
   other: "🍪 その他",
 };
 categorySelect.addEventListener("change", () => {
