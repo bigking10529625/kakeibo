@@ -250,6 +250,13 @@ function cycleAtOffset(offsetMonths) {
   return { cycleStart, nextPayday };
 }
 const fmtDateShort = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+// 給料が入力済みのサイクル開始日(YYYY-MM-DD)から、そのサイクルの範囲を復元する
+function cycleFromStartDate(cycleStart) {
+  const payDay = state.settings.paydayDay || 25;
+  const nm = addMonths(cycleStart.getFullYear(), cycleStart.getMonth(), 1);
+  const nextPayday = paydayDateFor(nm.year, nm.month, payDay);
+  return { cycleStart, nextPayday };
+}
 function totalFixedCosts() {
   return state.fixedCosts.reduce((s, f) => s + f.amount, 0);
 }
@@ -271,7 +278,17 @@ const yen = (n) => "¥" + Math.round(n).toLocaleString("ja-JP");
 const tabButtons = document.querySelectorAll(".tab-btn");
 const views = document.querySelectorAll(".view");
 const topbarTitle = document.getElementById("topbarTitle");
-const titles = { home: "家計簿", add: "レシートを追加", analysis: "分析", weight: "体重管理", budget: "予算とアドバイス" };
+const titles = {
+  home: "家計簿",
+  add: "レシートを登録",
+  analysis: "分析",
+  savings: "貯金",
+  budget: "設定",
+  "home-health": "健康管理",
+  "weight-chart": "体重管理",
+  "weight-entry": "体重を記録",
+  "weight-goal": "目標体重",
+};
 
 function showView(name) {
   views.forEach((v) => v.classList.toggle("active", v.id === `view-${name}`));
@@ -281,7 +298,24 @@ function showView(name) {
   if (name === "budget") renderBudget();
   if (name === "add") resetAddForm();
   if (name === "analysis") renderAnalysis();
-  if (name === "weight") renderWeight();
+  if (name === "savings") renderSavings();
+  if (name === "home-health") renderHealthHome();
+  if (name === "weight-chart" || name === "weight-entry" || name === "weight-goal") renderWeight();
+}
+
+// ---------- モード切替（家計簿 / 健康管理） ----------
+let currentMode = state.settings.uiMode || "money";
+document.querySelectorAll(".mode-btn").forEach((btn) => {
+  btn.addEventListener("click", () => setMode(btn.dataset.mode));
+});
+function setMode(mode) {
+  currentMode = mode;
+  state.settings.uiMode = mode;
+  saveSettings();
+  document.querySelectorAll(".mode-btn").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  document.getElementById("tabbarMoney").hidden = mode !== "money";
+  document.getElementById("tabbarHealth").hidden = mode !== "health";
+  showView(mode === "money" ? "home" : "home-health");
 }
 tabButtons.forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
 
@@ -367,9 +401,6 @@ function renderHome() {
   document.getElementById("homeAdviceIcon").textContent = advice.icon;
   document.getElementById("homeAdviceText").textContent = advice.text;
 
-  renderMealSuggestions();
-  renderWeightSnapshot();
-
   // カテゴリ別
   const byCat = {};
   txs.forEach((t) => {
@@ -432,6 +463,13 @@ function renderHome() {
 
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---------- 健康管理：ホーム ----------
+function renderHealthHome() {
+  renderWeightSnapshot();
+  renderMealSuggestions();
+  document.getElementById("healthHomeEmpty").hidden = state.weightLogs.length > 0;
 }
 
 // ---------- 分析画面 ----------
@@ -1126,6 +1164,62 @@ function renderIncomeFormForSelectedCycle() {
 }
 document.getElementById("incomeCycleSelect").addEventListener("change", renderIncomeFormForSelectedCycle);
 
+// ---------- 貯金（給料を入力したサイクルの予算−支出を自動で積み立て） ----------
+function computeSavingsHistory() {
+  const today = todayMidnight();
+  const keys = Object.keys(state.income).sort();
+  return keys.map((key) => {
+    const cycle = cycleFromStartDate(new Date(key + "T00:00:00"));
+    const income = state.income[key];
+    const budget = income - totalFixedCosts();
+    const spent = transactionsInCycle(cycle).reduce((s, t) => s + t.amount, 0);
+    const saved = budget - spent;
+    const isPast = cycle.nextPayday <= today;
+    return { cycle, income, spent, saved, isPast };
+  });
+}
+
+function renderSavings() {
+  const history = computeSavingsHistory();
+  const total = history.filter((h) => h.isPast).reduce((s, h) => s + h.saved, 0);
+  document.getElementById("savingsTotal").textContent = yen(total);
+
+  const current = history.find((h) => !h.isPast);
+  const progressEl = document.getElementById("savingsCurrentProgress");
+  if (current) {
+    progressEl.hidden = false;
+    const sign = current.saved >= 0 ? "+" : "";
+    document.getElementById("savingsCurrentText").textContent = `今サイクル進行中: ${sign}${yen(current.saved)}`;
+  } else {
+    progressEl.hidden = true;
+  }
+
+  const listEl = document.getElementById("savingsHistoryList");
+  const emptyEl = document.getElementById("savingsEmpty");
+  listEl.innerHTML = "";
+  if (history.length === 0) {
+    emptyEl.hidden = false;
+  } else {
+    emptyEl.hidden = true;
+    [...history].reverse().forEach((h) => {
+      const endDate = new Date(h.cycle.nextPayday.getTime() - 86400000);
+      const label = `${fmtDateShort(h.cycle.cycleStart)}〜${fmtDateShort(endDate)}${h.isPast ? "" : "（進行中）"}`;
+      const sign = h.saved >= 0 ? "+" : "";
+      const row = document.createElement("div");
+      row.className = "tx-row";
+      row.innerHTML = `
+        <div class="tx-emoji">${h.saved >= 0 ? "🐷" : "⚠️"}</div>
+        <div class="tx-main">
+          <div class="tx-cat">${label}</div>
+          <div class="tx-meta">給料 ${yen(h.income)} ・ 使用 ${yen(h.spent)}</div>
+        </div>
+        <div class="tx-amount" style="color:${h.saved >= 0 ? "var(--primary)" : "var(--danger)"}">${sign}${yen(h.saved)}</div>
+      `;
+      listEl.appendChild(row);
+    });
+  }
+}
+
 function renderBudget() {
   paydaySelect.value = state.settings.paydayDay || 25;
   document.getElementById("dietModeToggle").checked = !!state.settings.dietMode;
@@ -1705,4 +1799,7 @@ function extractDate(text) {
 }
 
 // ---------- 初期化 ----------
-showView("home");
+document.querySelectorAll(".mode-btn").forEach((b) => b.classList.toggle("active", b.dataset.mode === currentMode));
+document.getElementById("tabbarMoney").hidden = currentMode !== "money";
+document.getElementById("tabbarHealth").hidden = currentMode !== "health";
+showView(currentMode === "money" ? "home" : "home-health");

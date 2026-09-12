@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="家計簿" />
 <link rel="manifest" href="manifest.json" />
 <title>家計簿 - 写真でかんたん家計簿</title>
-<link rel="stylesheet" href="style.css?v=8" />
+<link rel="stylesheet" href="style.css?v=9" />
 </head>
 <body>
 <div id="app">
@@ -18,9 +18,14 @@
     <h1 id="topbarTitle">家計簿</h1>
   </header>
 
+  <div class="mode-switch">
+    <button type="button" class="mode-btn active" data-mode="money">💰 家計簿</button>
+    <button type="button" class="mode-btn" data-mode="health">❤️ 健康管理</button>
+  </div>
+
   <main id="views">
 
-    <!-- ホーム -->
+    <!-- ============ 家計簿：ホーム ============ -->
     <section id="view-home" class="view active">
       <div class="cycle-card">
         <div class="cycle-card-row">
@@ -42,26 +47,6 @@
         <div class="advice-text" id="homeAdviceText">予算を設定するとアドバイスが表示されます</div>
       </div>
 
-      <div class="weight-snapshot" id="weightSnapshot" hidden>
-        <div class="weight-snapshot-main">
-          <span class="weight-snapshot-label">現在の体重</span>
-          <span class="weight-snapshot-value" id="weightSnapshotValue">--kg</span>
-        </div>
-        <div class="weight-snapshot-side">
-          <span class="weight-snapshot-delta" id="weightSnapshotDelta"></span>
-          <span class="weight-snapshot-fat" id="weightSnapshotFat"></span>
-        </div>
-      </div>
-
-      <div class="meal-card" id="mealCard" hidden>
-        <div class="meal-card-head">
-          <h2>🥗 今日のごはん提案</h2>
-          <button type="button" id="mealShuffleBtn" class="text-btn small">🔀 他の提案</button>
-        </div>
-        <p class="meal-card-note" id="mealCardNote" hidden></p>
-        <div id="mealList" class="meal-list"></div>
-      </div>
-
       <div class="section-heading">
         <h2>カテゴリ別（今サイクル）</h2>
       </div>
@@ -70,11 +55,11 @@
       <details class="list-details" id="homeTxDetails">
         <summary>最近の記録を見る<span class="count-badge" id="homeTxCount">0件</span></summary>
         <div id="homeTxList" class="tx-list"></div>
-        <p id="homeEmptyState" class="empty-state" hidden>まだ記録がありません。「追加」タブからレシート写真を読み込んでみましょう。</p>
+        <p id="homeEmptyState" class="empty-state" hidden>まだ記録がありません。「登録」タブからレシート写真を読み込んでみましょう。</p>
       </details>
     </section>
 
-    <!-- 追加 -->
+    <!-- ============ 家計簿：登録 ============ -->
     <section id="view-add" class="view">
       <div class="capture-card">
         <label class="capture-btn" for="photoInput">
@@ -145,7 +130,7 @@
       <button type="button" id="manualAddBtn" class="text-btn">写真を使わず手入力する</button>
     </section>
 
-    <!-- 分析 -->
+    <!-- ============ 家計簿：分析 ============ -->
     <section id="view-analysis" class="view">
       <select id="analysisMonth" class="month-select"></select>
 
@@ -180,100 +165,26 @@
       <div id="trendChart" class="trend-chart"></div>
     </section>
 
-    <!-- 体重 -->
-    <section id="view-weight" class="view">
-      <form id="weightForm" class="tx-form" style="margin-top:10px;">
-        <label class="field">
-          <span>体重</span>
-          <div class="amount-input-wrap">
-            <input type="number" id="weightInput" inputmode="decimal" step="0.1" min="0" required placeholder="例）62.5" />
-            <span class="unit-suffix">kg</span>
-          </div>
-        </label>
-        <label class="field">
-          <span>体脂肪率（任意）</span>
-          <div class="amount-input-wrap">
-            <input type="number" id="bodyFatInput" inputmode="decimal" step="0.1" min="0" max="100" placeholder="例）22.0" />
-            <span class="unit-suffix">%</span>
-          </div>
-        </label>
-        <label class="field">
-          <span>日付</span>
-          <input type="date" id="weightDate" required />
-        </label>
-        <label class="field">
-          <span>時刻（任意）</span>
-          <select id="weightHour">
-            <option value="" disabled selected>--</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>メモ（任意）</span>
-          <input type="text" id="weightMemo" placeholder="例）朝食前" />
-        </label>
-        <button type="submit" class="primary-btn">記録する</button>
-      </form>
-
-      <div class="weight-stats-row">
-        <div class="advice-stat">
-          <span class="advice-stat-label">現在の体重</span>
-          <span class="advice-stat-value" id="weightStatCurrent">--kg</span>
+    <!-- ============ 家計簿：貯金 ============ -->
+    <section id="view-savings" class="view">
+      <div class="cycle-card">
+        <div class="cycle-card-row">
+          <span class="cycle-label">総貯金額</span>
         </div>
-        <div class="advice-stat">
-          <span class="advice-stat-label">体脂肪率</span>
-          <span class="advice-stat-value" id="weightStatFat">--%</span>
-        </div>
-        <div class="advice-stat highlight">
-          <span class="advice-stat-label">目標まで</span>
-          <span class="advice-stat-value" id="weightStatToGoal">未設定</span>
+        <div class="cycle-remaining" id="savingsTotal">¥0</div>
+        <div class="cycle-card-row small" id="savingsCurrentProgress" hidden>
+          <span id="savingsCurrentText"></span>
         </div>
       </div>
-
-      <div class="range-pills" id="weightRangePills">
-        <button type="button" class="range-pill" data-range="7d">1週間</button>
-        <button type="button" class="range-pill active" data-range="30d">1ヶ月</button>
-        <button type="button" class="range-pill" data-range="90d">3ヶ月</button>
-        <button type="button" class="range-pill" data-range="month">月を選択</button>
-        <button type="button" class="range-pill" data-range="all">すべて</button>
-      </div>
-      <select id="weightMonthSelect" class="month-select" hidden></select>
-
-      <div id="weightChartWrap" class="weight-chart-wrap" hidden>
-        <div class="weight-progress-badge" id="weightProgressBadge" hidden>
-          <span class="badge-icon" id="weightProgressIcon">📉</span>
-          <span id="weightProgressText"></span>
-        </div>
-        <div class="weight-legend">
-          <span class="legend-pill weight"><i></i>体重</span>
-          <span class="legend-pill fat" id="fatLegendItem" hidden><i></i>体脂肪率</span>
-          <span class="legend-pill target" id="targetLegendItem" hidden><i></i>目標体重</span>
-        </div>
-        <div id="weightChart"></div>
-        <p id="weightRangeEmpty" class="empty-state" hidden>この期間の記録がありません。</p>
-      </div>
-      <p id="weightChartEmpty" class="empty-state">まだ記録がありません。上のフォームから体重を記録してみましょう。</p>
-
-      <details class="list-details" id="weightLogDetails">
-        <summary>記録一覧を見る<span class="count-badge" id="weightLogCount">0件</span></summary>
-        <div id="weightLogList" class="tx-list"></div>
-      </details>
 
       <div class="section-heading">
-        <h2>目標体重</h2>
+        <h2>サイクルごとの履歴</h2>
       </div>
-      <form id="targetWeightForm" class="tx-form inline-form">
-        <label class="field">
-          <span>目標体重（任意）</span>
-          <div class="amount-input-wrap">
-            <input type="number" id="targetWeight" inputmode="decimal" step="0.1" min="0" placeholder="例）60.0" />
-            <span class="unit-suffix">kg</span>
-          </div>
-        </label>
-        <button type="submit" class="ghost-btn">保存</button>
-      </form>
+      <div id="savingsHistoryList" class="tx-list"></div>
+      <p id="savingsEmpty" class="empty-state" hidden>給料を入力すると、貯金の履歴がここに表示されます。</p>
     </section>
 
-    <!-- 予算 -->
+    <!-- ============ 家計簿：設定 ============ -->
     <section id="view-budget" class="view">
       <div class="section-heading">
         <h2>給料日</h2>
@@ -285,7 +196,7 @@
         </label>
         <label class="checkbox-row">
           <input type="checkbox" id="dietModeToggle" />
-          <span>🥗 ダイエット中 - ホームにごはん提案を表示する</span>
+          <span>🥗 ダイエット中 - 健康管理ホームにごはん提案を表示する</span>
         </label>
         <button type="submit" class="ghost-btn">保存</button>
       </form>
@@ -306,7 +217,7 @@
       </form>
 
       <div class="section-heading">
-        <h2>固定費（毎月自動で引き継がれます）</h2>
+        <h2>固定費（ランニングコスト・毎月自動で引き継がれます）</h2>
       </div>
       <form id="fixedCostForm" class="tx-form inline-form">
         <label class="field">
@@ -395,29 +306,167 @@
       <button type="button" id="resetDataBtn" class="ghost-btn danger">すべてのデータを削除</button>
     </section>
 
+    <!-- ============ 健康管理：ホーム ============ -->
+    <section id="view-home-health" class="view">
+      <div class="weight-snapshot" id="weightSnapshot" hidden>
+        <div class="weight-snapshot-main">
+          <span class="weight-snapshot-label">現在の体重</span>
+          <span class="weight-snapshot-value" id="weightSnapshotValue">--kg</span>
+        </div>
+        <div class="weight-snapshot-side">
+          <span class="weight-snapshot-delta" id="weightSnapshotDelta"></span>
+          <span class="weight-snapshot-fat" id="weightSnapshotFat"></span>
+        </div>
+      </div>
+      <p class="empty-state" id="healthHomeEmpty" hidden>まだ体重の記録がありません。「登録」タブから記録してみましょう。</p>
+
+      <div class="meal-card" id="mealCard" hidden>
+        <div class="meal-card-head">
+          <h2>🥗 今日のごはん提案</h2>
+          <button type="button" id="mealShuffleBtn" class="text-btn small">🔀 他の提案</button>
+        </div>
+        <p class="meal-card-note" id="mealCardNote" hidden></p>
+        <div id="mealList" class="meal-list"></div>
+      </div>
+    </section>
+
+    <!-- ============ 健康管理：体重管理（グラフ） ============ -->
+    <section id="view-weight-chart" class="view">
+      <div class="weight-stats-row">
+        <div class="advice-stat">
+          <span class="advice-stat-label">現在の体重</span>
+          <span class="advice-stat-value" id="weightStatCurrent">--kg</span>
+        </div>
+        <div class="advice-stat">
+          <span class="advice-stat-label">体脂肪率</span>
+          <span class="advice-stat-value" id="weightStatFat">--%</span>
+        </div>
+        <div class="advice-stat highlight">
+          <span class="advice-stat-label">目標まで</span>
+          <span class="advice-stat-value" id="weightStatToGoal">未設定</span>
+        </div>
+      </div>
+
+      <div class="range-pills" id="weightRangePills">
+        <button type="button" class="range-pill" data-range="7d">1週間</button>
+        <button type="button" class="range-pill active" data-range="30d">1ヶ月</button>
+        <button type="button" class="range-pill" data-range="90d">3ヶ月</button>
+        <button type="button" class="range-pill" data-range="month">月を選択</button>
+        <button type="button" class="range-pill" data-range="all">すべて</button>
+      </div>
+      <select id="weightMonthSelect" class="month-select" hidden></select>
+
+      <div id="weightChartWrap" class="weight-chart-wrap" hidden>
+        <div class="weight-progress-badge" id="weightProgressBadge" hidden>
+          <span class="badge-icon" id="weightProgressIcon">📉</span>
+          <span id="weightProgressText"></span>
+        </div>
+        <div class="weight-legend">
+          <span class="legend-pill weight"><i></i>体重</span>
+          <span class="legend-pill fat" id="fatLegendItem" hidden><i></i>体脂肪率</span>
+          <span class="legend-pill target" id="targetLegendItem" hidden><i></i>目標体重</span>
+        </div>
+        <div id="weightChart"></div>
+        <p id="weightRangeEmpty" class="empty-state" hidden>この期間の記録がありません。</p>
+      </div>
+      <p id="weightChartEmpty" class="empty-state">まだ記録がありません。「登録」タブから体重を記録してみましょう。</p>
+
+      <details class="list-details" id="weightLogDetails">
+        <summary>記録一覧を見る<span class="count-badge" id="weightLogCount">0件</span></summary>
+        <div id="weightLogList" class="tx-list"></div>
+      </details>
+    </section>
+
+    <!-- ============ 健康管理：登録 ============ -->
+    <section id="view-weight-entry" class="view">
+      <form id="weightForm" class="tx-form" style="margin-top:10px;">
+        <label class="field">
+          <span>体重</span>
+          <div class="amount-input-wrap">
+            <input type="number" id="weightInput" inputmode="decimal" step="0.1" min="0" required placeholder="例）62.5" />
+            <span class="unit-suffix">kg</span>
+          </div>
+        </label>
+        <label class="field">
+          <span>体脂肪率（任意）</span>
+          <div class="amount-input-wrap">
+            <input type="number" id="bodyFatInput" inputmode="decimal" step="0.1" min="0" max="100" placeholder="例）22.0" />
+            <span class="unit-suffix">%</span>
+          </div>
+        </label>
+        <label class="field">
+          <span>日付</span>
+          <input type="date" id="weightDate" required />
+        </label>
+        <label class="field">
+          <span>時刻（任意）</span>
+          <select id="weightHour">
+            <option value="" disabled selected>--</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>メモ（任意）</span>
+          <input type="text" id="weightMemo" placeholder="例）朝食前" />
+        </label>
+        <button type="submit" class="primary-btn">記録する</button>
+      </form>
+    </section>
+
+    <!-- ============ 健康管理：目標設定 ============ -->
+    <section id="view-weight-goal" class="view">
+      <div class="section-heading" style="margin-top:10px;">
+        <h2>目標体重</h2>
+      </div>
+      <form id="targetWeightForm" class="tx-form inline-form">
+        <label class="field">
+          <span>目標体重（任意）</span>
+          <div class="amount-input-wrap">
+            <input type="number" id="targetWeight" inputmode="decimal" step="0.1" min="0" placeholder="例）60.0" />
+            <span class="unit-suffix">kg</span>
+          </div>
+        </label>
+        <button type="submit" class="ghost-btn">保存</button>
+      </form>
+    </section>
+
   </main>
 
-  <nav class="tabbar">
+  <nav class="tabbar" id="tabbarMoney">
     <button class="tab-btn active" data-view="home">
       <span class="tab-icon">🏠</span><span>ホーム</span>
     </button>
     <button class="tab-btn" data-view="add">
-      <span class="tab-icon">➕</span><span>追加</span>
+      <span class="tab-icon">➕</span><span>登録</span>
     </button>
     <button class="tab-btn" data-view="analysis">
       <span class="tab-icon">📊</span><span>分析</span>
     </button>
-    <button class="tab-btn" data-view="weight">
-      <span class="tab-icon">⚖️</span><span>体重</span>
+    <button class="tab-btn" data-view="savings">
+      <span class="tab-icon">🐷</span><span>貯金</span>
     </button>
     <button class="tab-btn" data-view="budget">
-      <span class="tab-icon">💰</span><span>予算</span>
+      <span class="tab-icon">⚙️</span><span>設定</span>
+    </button>
+  </nav>
+
+  <nav class="tabbar" id="tabbarHealth" hidden>
+    <button class="tab-btn" data-view="home-health">
+      <span class="tab-icon">🏠</span><span>ホーム</span>
+    </button>
+    <button class="tab-btn" data-view="weight-chart">
+      <span class="tab-icon">📈</span><span>体重管理</span>
+    </button>
+    <button class="tab-btn" data-view="weight-entry">
+      <span class="tab-icon">➕</span><span>登録</span>
+    </button>
+    <button class="tab-btn" data-view="weight-goal">
+      <span class="tab-icon">🎯</span><span>目標設定</span>
     </button>
   </nav>
 
   <div id="toast" class="toast" hidden></div>
 </div>
 
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
