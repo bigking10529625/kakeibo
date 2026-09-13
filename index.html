@@ -429,7 +429,8 @@
           <span>メモ（任意）</span>
           <input type="text" id="weightMemo" placeholder="例）朝食前" />
         </label>
-        <button type="submit" class="primary-btn">記録する</button>
+        <button type="submit" class="primary-btn" id="weightSubmitBtn">記録する</button>
+        <button type="button" id="weightCancelBtn" class="ghost-btn" hidden>キャンセル</button>
       </form>
     </section>
 
@@ -472,7 +473,8 @@
           <span>メモ（任意）</span>
           <input type="text" id="workoutMemo" placeholder="例）公園を1周" />
         </label>
-        <button type="submit" class="primary-btn">記録する</button>
+        <button type="submit" class="primary-btn" id="workoutSubmitBtn">記録する</button>
+        <button type="button" id="workoutCancelBtn" class="ghost-btn" hidden>キャンセル</button>
       </form>
 
       <details class="list-details" id="workoutLogDetails">

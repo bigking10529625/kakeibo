@@ -316,6 +316,8 @@ function showView(name) {
     renderHealthHome();
     renderWeight();
   }
+  if (name === "weight-entry") resetWeightEntryForm();
+  if (name === "workout") resetWorkoutForm();
   if (name === "weight-entry" || name === "weight-goal") renderWeight();
   if (name === "workout") renderWorkout();
 }
@@ -806,7 +808,7 @@ for (let h = 0; h <= 23; h++) {
   weightHourSelect.appendChild(opt);
 }
 
-function makeScale(values, padFrac, top, bottom) {
+function scaleDomain(values, padFrac) {
   let min = Math.min(...values);
   let max = Math.max(...values);
   if (min === max) {
@@ -814,9 +816,32 @@ function makeScale(values, padFrac, top, bottom) {
     max += 1;
   }
   const pad = (max - min) * padFrac;
-  min -= pad;
-  max += pad;
+  return [min - pad, max + pad];
+}
+
+function makeScale(values, padFrac, top, bottom) {
+  const [min, max] = scaleDomain(values, padFrac);
   return (v) => bottom - ((v - min) / (max - min)) * (bottom - top);
+}
+
+// min〜maxの範囲に収まる「キリのいい」目盛り値を数個生成する
+function niceTicks(min, max, count) {
+  const range = max - min;
+  if (range <= 0) return [Math.round(min * 10) / 10];
+  const rawStep = range / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const norm = rawStep / mag;
+  let step;
+  if (norm < 1.5) step = 1 * mag;
+  else if (norm < 3) step = 2 * mag;
+  else if (norm < 7) step = 5 * mag;
+  else step = 10 * mag;
+  const start = Math.ceil(min / step) * step;
+  const ticks = [];
+  for (let v = start; v <= max + 1e-9; v += step) {
+    ticks.push(Math.round(v * 10) / 10);
+  }
+  return ticks;
 }
 
 // weightPoints: [{date, weight}] 昇順, fatPoints: [{date, bodyFat}] 昇順(体脂肪が入っている記録のみ), target: 目標体重 or null
@@ -828,14 +853,6 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat, workoutDates
     padX = 14,
     labelY = 175,
     totalH = 192;
-
-  // 横方向のグリッド線（目盛り）で値の変化を読み取りやすくする
-  let gridLines = "";
-  const gridRows = 4;
-  for (let i = 1; i < gridRows; i++) {
-    const gy = chartTop + ((chartH - chartTop) / gridRows) * i;
-    gridLines += `<line x1="${padX}" y1="${gy.toFixed(1)}" x2="${w - padX}" y2="${gy.toFixed(1)}" stroke="var(--border)" stroke-width="1" />`;
-  }
 
   const allTs = weightPoints.map((p) => pointTs(p));
   const minTs = Math.min(...allTs);
@@ -849,6 +866,35 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat, workoutDates
     return padX + ((ts - minTs) / (maxTs - minTs)) * (w - padX * 2);
   };
 
+  const weightValues = weightPoints.map((p) => p.weight).concat(target ? [target] : []);
+  const weightScale = makeScale(weightValues, 0.15, chartTop, chartH);
+
+  // 横方向の薄い基準線（例: 73kgのライン）に数値ラベルを添えて読み取りやすくする
+  const [wDomainMin, wDomainMax] = scaleDomain(weightValues, 0.15);
+  let gridLines = "";
+  niceTicks(wDomainMin, wDomainMax, 3).forEach((tickVal) => {
+    const gy = weightScale(tickVal);
+    gridLines += `
+      <line x1="${padX}" y1="${gy.toFixed(1)}" x2="${w - padX}" y2="${gy.toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 3" />
+      <text x="${padX}" y="${(gy - 3).toFixed(1)}" font-size="9.5" fill="var(--text-muted)">${tickVal}kg</text>
+    `;
+  });
+
+  // 縦方向の薄い基準線（例: 9/9のライン）で特定の日付を追いやすくする
+  let vGridLines = "";
+  if (minTs !== maxTs) {
+    [0.25, 0.5, 0.75].forEach((frac) => {
+      const ts = minTs + (maxTs - minTs) * frac;
+      const x = xOfTs(ts);
+      const d = new Date(ts);
+      const label = `${d.getMonth() + 1}/${d.getDate()}`;
+      vGridLines += `
+        <line x1="${x.toFixed(1)}" y1="${chartTop}" x2="${x.toFixed(1)}" y2="${chartH}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 3" />
+        <text x="${x.toFixed(1)}" y="${labelY}" font-size="10" fill="var(--text-muted)" text-anchor="middle">${label}</text>
+      `;
+    });
+  }
+
   // 運動した日をグラフ下部に緑の点で表示（体重推移との関連を見やすくする）
   let workoutMarkers = "";
   if (workoutDates && workoutDates.length) {
@@ -859,9 +905,6 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat, workoutDates
       workoutMarkers += `<circle cx="${x.toFixed(1)}" cy="${(chartH + 7).toFixed(1)}" r="2.5" fill="#10b981" />`;
     });
   }
-
-  const weightValues = weightPoints.map((p) => p.weight).concat(target ? [target] : []);
-  const weightScale = makeScale(weightValues, 0.15, chartTop, chartH);
 
   const wCoords = weightPoints.map((p) => [xOf(p), weightScale(p.weight)]);
   const wLinePath = wCoords.map((c, i) => (i === 0 ? "M" : "L") + c[0].toFixed(1) + "," + c[1].toFixed(1)).join(" ");
@@ -940,6 +983,7 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat, workoutDates
   const lastLabel = weightPoints[weightPoints.length - 1].date.slice(5).replace("-", "/");
   return `
     <svg viewBox="0 0 ${w} ${totalH}" style="width:100%; height:auto; display:block; overflow:visible;">
+      ${vGridLines}
       ${gridLines}
       <path d="${wAreaPath}" fill="var(--primary-tint)" stroke="none" />
       ${targetLine}
@@ -1003,6 +1047,7 @@ function renderWeightLogList() {
       </div>
       <button class="tx-delete" data-id="${w.id}" aria-label="削除">✕</button>
     `;
+    row.querySelector(".tx-main").addEventListener("click", () => startEditWeight(w));
     listEl.appendChild(row);
   });
   listEl.querySelectorAll(".tx-delete").forEach((btn) => {
@@ -1191,6 +1236,31 @@ document.getElementById("targetWeightForm").addEventListener("submit", (e) => {
   showToast("目標を保存しました");
 });
 
+let editingWeightId = null;
+
+function resetWeightEntryForm() {
+  editingWeightId = null;
+  document.getElementById("weightSubmitBtn").textContent = "記録する";
+  document.getElementById("weightCancelBtn").hidden = true;
+  document.getElementById("weightForm").reset();
+}
+
+function startEditWeight(w) {
+  showView("weight-entry"); // 内部でresetWeightEntryForm()が走るため、上書きはこの後に行う
+  editingWeightId = w.id;
+  document.getElementById("weightSubmitBtn").textContent = "更新する";
+  document.getElementById("weightCancelBtn").hidden = false;
+  document.getElementById("weightInput").value = w.weight;
+  document.getElementById("bodyFatInput").value = w.bodyFat ?? "";
+  document.getElementById("weightDate").value = w.date;
+  document.getElementById("weightHour").value = w.hour ?? "";
+  document.getElementById("weightMemo").value = w.memo || "";
+}
+
+document.getElementById("weightCancelBtn").addEventListener("click", () => {
+  resetWeightEntryForm();
+});
+
 document.getElementById("weightForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const weight = parseFloat(document.getElementById("weightInput").value);
@@ -1198,17 +1268,38 @@ document.getElementById("weightForm").addEventListener("submit", (e) => {
   const fatRaw = document.getElementById("bodyFatInput").value;
   const bodyFat = fatRaw === "" ? null : parseFloat(fatRaw);
   const hourRaw = document.getElementById("weightHour").value;
+  const date = document.getElementById("weightDate").value;
+  const hour = hourRaw === "" ? null : parseInt(hourRaw, 10);
+  const memo = document.getElementById("weightMemo").value.trim();
+
+  if (editingWeightId) {
+    const w = state.weightLogs.find((x) => x.id === editingWeightId);
+    if (w) {
+      w.weight = weight;
+      w.bodyFat = bodyFat;
+      w.date = date;
+      w.hour = hour;
+      w.memo = memo;
+    }
+    saveWeightLogs();
+    resetWeightEntryForm();
+    renderWeight();
+    renderWeightSnapshot();
+    showToast("更新しました");
+    return;
+  }
+
   const entry = {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     weight,
     bodyFat,
-    date: document.getElementById("weightDate").value,
-    hour: hourRaw === "" ? null : parseInt(hourRaw, 10),
-    memo: document.getElementById("weightMemo").value.trim(),
+    date,
+    hour,
+    memo,
   };
   state.weightLogs.push(entry);
   saveWeightLogs();
-  document.getElementById("weightForm").reset();
+  resetWeightEntryForm();
   renderWeight();
   renderWeightSnapshot();
   showToast("記録しました");
@@ -1276,6 +1367,7 @@ function renderWorkoutList() {
       </div>
       <button class="tx-delete" data-id="${w.id}" aria-label="削除">✕</button>
     `;
+    row.querySelector(".tx-main").addEventListener("click", () => startEditWorkout(w));
     listEl.appendChild(row);
   });
   listEl.querySelectorAll(".tx-delete").forEach((btn) => {
@@ -1297,25 +1389,78 @@ function renderWorkout() {
   renderWorkoutList();
 }
 
+let editingWorkoutId = null;
+
+function resetWorkoutForm() {
+  editingWorkoutId = null;
+  document.getElementById("workoutSubmitBtn").textContent = "記録する";
+  document.getElementById("workoutCancelBtn").hidden = true;
+  document.getElementById("workoutForm").reset();
+}
+
+function startEditWorkout(w) {
+  showView("workout"); // 内部でresetWorkoutForm()が走るため、上書きはこの後に行う
+  editingWorkoutId = w.id;
+  document.getElementById("workoutSubmitBtn").textContent = "更新する";
+  document.getElementById("workoutCancelBtn").hidden = false;
+  workoutTypeSelect.value = w.type;
+  syncWorkoutFieldVisibility();
+  document.getElementById("workoutDistance").value = w.distance ?? "";
+  document.getElementById("workoutDuration").value = w.duration ?? "";
+  document.getElementById("workoutMenu").value = w.menu || "";
+  document.getElementById("workoutDate").value = w.date;
+  document.getElementById("workoutMemo").value = w.memo || "";
+}
+
+document.getElementById("workoutCancelBtn").addEventListener("click", () => {
+  resetWorkoutForm();
+});
+
 document.getElementById("workoutForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const type = workoutTypeSelect.value;
   const distanceRaw = document.getElementById("workoutDistance").value;
   const durationRaw = document.getElementById("workoutDuration").value;
   const duration = durationRaw === "" ? null : parseInt(durationRaw, 10);
+  const distance = distanceRaw === "" ? null : parseFloat(distanceRaw);
+  const menu = WORKOUT_MENU_TYPES.includes(type) ? document.getElementById("workoutMenu").value.trim() : "";
+  const date = document.getElementById("workoutDate").value;
+  const memo = document.getElementById("workoutMemo").value.trim();
+  const calories = estimateWorkoutCalories(type, duration);
+
+  if (editingWorkoutId) {
+    const w = state.workouts.find((x) => x.id === editingWorkoutId);
+    if (w) {
+      w.type = type;
+      w.distance = distance;
+      w.duration = duration;
+      w.calories = calories;
+      w.menu = menu;
+      w.date = date;
+      w.memo = memo;
+    }
+    saveWorkouts();
+    resetWorkoutForm();
+    renderWorkout();
+    renderWorkoutSummary();
+    renderWeight();
+    showToast("更新しました");
+    return;
+  }
+
   const entry = {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     type,
-    distance: distanceRaw === "" ? null : parseFloat(distanceRaw),
+    distance,
     duration,
-    calories: estimateWorkoutCalories(type, duration),
-    menu: WORKOUT_MENU_TYPES.includes(type) ? document.getElementById("workoutMenu").value.trim() : "",
-    date: document.getElementById("workoutDate").value,
-    memo: document.getElementById("workoutMemo").value.trim(),
+    calories,
+    menu,
+    date,
+    memo,
   };
   state.workouts.push(entry);
   saveWorkouts();
-  document.getElementById("workoutForm").reset();
+  resetWorkoutForm();
   renderWorkout();
   renderWorkoutSummary();
   renderWeight();
