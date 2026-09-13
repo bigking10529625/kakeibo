@@ -875,12 +875,13 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat, workoutDates
   niceTicks(wDomainMin, wDomainMax, 3).forEach((tickVal) => {
     const gy = weightScale(tickVal);
     gridLines += `
-      <line x1="${padX}" y1="${gy.toFixed(1)}" x2="${w - padX}" y2="${gy.toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 3" />
-      <text x="${padX}" y="${(gy - 3).toFixed(1)}" font-size="9.5" fill="var(--text-muted)">${tickVal}kg</text>
+      <line x1="${padX}" y1="${gy.toFixed(1)}" x2="${w - padX}" y2="${gy.toFixed(1)}" stroke="var(--text-muted)" stroke-width="1.3" stroke-dasharray="4 3" opacity="0.55" />
+      <rect x="${padX}" y="${(gy - 12).toFixed(1)}" width="${(String(tickVal).length + 2) * 6.5}" height="13" fill="var(--surface)" opacity="0.9" rx="3" />
+      <text x="${padX + 2}" y="${(gy - 2.5).toFixed(1)}" font-size="10.5" font-weight="700" fill="var(--text)">${tickVal}kg</text>
     `;
   });
 
-  // 縦方向の薄い基準線（例: 9/9のライン）で特定の日付を追いやすくする
+  // 縦方向の基準線（例: 9/9のライン）で特定の日付を追いやすくする
   let vGridLines = "";
   if (minTs !== maxTs) {
     [0.25, 0.5, 0.75].forEach((frac) => {
@@ -889,8 +890,8 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat, workoutDates
       const d = new Date(ts);
       const label = `${d.getMonth() + 1}/${d.getDate()}`;
       vGridLines += `
-        <line x1="${x.toFixed(1)}" y1="${chartTop}" x2="${x.toFixed(1)}" y2="${chartH}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 3" />
-        <text x="${x.toFixed(1)}" y="${labelY}" font-size="10" fill="var(--text-muted)" text-anchor="middle">${label}</text>
+        <line x1="${x.toFixed(1)}" y1="${chartTop}" x2="${x.toFixed(1)}" y2="${chartH}" stroke="var(--text-muted)" stroke-width="1.3" stroke-dasharray="4 3" opacity="0.55" />
+        <text x="${x.toFixed(1)}" y="${labelY}" font-size="10.5" font-weight="700" fill="var(--text)" text-anchor="middle">${label}</text>
       `;
     });
   }
