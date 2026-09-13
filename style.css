@@ -60,12 +60,15 @@ html, body {
   position: relative;
 }
 
-.topbar {
-  padding: calc(14px + var(--safe-top)) 20px 14px;
-  background: var(--bg);
+.top-sticky {
   position: sticky;
   top: 0;
   z-index: 5;
+  background: var(--bg);
+}
+.topbar {
+  padding: calc(14px + var(--safe-top)) 20px 14px;
+  background: var(--bg);
 }
 .topbar h1 {
   margin: 0;
@@ -557,6 +560,8 @@ html, body {
 .legend-pill.fat i { background: repeating-linear-gradient(to right, currentColor 0 3px, transparent 3px 5px); }
 .legend-pill.target { color: var(--target-color, #6366f1); }
 .legend-pill.target i { background: repeating-linear-gradient(to right, currentColor 0 3px, transparent 3px 5px); }
+.legend-pill.target-fat { color: var(--fat-color, #f59e0b); }
+.legend-pill.target-fat i { background: repeating-linear-gradient(to right, currentColor 0 2px, transparent 2px 3px); }
 
 /* Analysis view */
 .month-select {

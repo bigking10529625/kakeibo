@@ -285,9 +285,8 @@ const titles = {
   savings: "貯金",
   budget: "設定",
   "home-health": "健康管理",
-  "weight-chart": "体重管理",
   "weight-entry": "体重を記録",
-  "weight-goal": "目標体重",
+  "weight-goal": "目標設定",
 };
 
 function showView(name) {
@@ -299,8 +298,11 @@ function showView(name) {
   if (name === "add") resetAddForm();
   if (name === "analysis") renderAnalysis();
   if (name === "savings") renderSavings();
-  if (name === "home-health") renderHealthHome();
-  if (name === "weight-chart" || name === "weight-entry" || name === "weight-goal") renderWeight();
+  if (name === "home-health") {
+    renderHealthHome();
+    renderWeight();
+  }
+  if (name === "weight-entry" || name === "weight-goal") renderWeight();
 }
 
 // ---------- モード切替（家計簿 / 健康管理） ----------
@@ -750,7 +752,7 @@ function makeScale(values, padFrac, top, bottom) {
 }
 
 // weightPoints: [{date, weight}] 昇順, fatPoints: [{date, bodyFat}] 昇順(体脂肪が入っている記録のみ), target: 目標体重 or null
-function buildWeightSvg(weightPoints, fatPoints, target) {
+function buildWeightSvg(weightPoints, fatPoints, target, targetFat) {
   if (weightPoints.length === 0) return "";
   const w = 340,
     chartTop = 12,
@@ -758,6 +760,14 @@ function buildWeightSvg(weightPoints, fatPoints, target) {
     padX = 14,
     labelY = 175,
     totalH = 192;
+
+  // 横方向のグリッド線（目盛り）で値の変化を読み取りやすくする
+  let gridLines = "";
+  const gridRows = 4;
+  for (let i = 1; i < gridRows; i++) {
+    const gy = chartTop + ((chartH - chartTop) / gridRows) * i;
+    gridLines += `<line x1="${padX}" y1="${gy.toFixed(1)}" x2="${w - padX}" y2="${gy.toFixed(1)}" stroke="var(--border)" stroke-width="1" />`;
+  }
 
   const allTs = weightPoints.map((p) => pointTs(p));
   const minTs = Math.min(...allTs);
@@ -804,19 +814,29 @@ function buildWeightSvg(weightPoints, fatPoints, target) {
 
   let fatLine = "";
   let fatDots = "";
+  let targetFatLine = "";
   if (fatPoints.length > 0) {
-    const fatScale = makeScale(
-      fatPoints.map((p) => p.bodyFat),
-      0.25,
-      chartTop,
-      chartH
-    );
+    const fatValues = fatPoints.map((p) => p.bodyFat).concat(targetFat ? [targetFat] : []);
+    const fatScale = makeScale(fatValues, 0.25, chartTop, chartH);
     const fCoords = fatPoints.map((p) => [xOf(p), fatScale(p.bodyFat)]);
     if (fCoords.length > 1) {
       const fLinePath = fCoords.map((c, i) => (i === 0 ? "M" : "L") + c[0].toFixed(1) + "," + c[1].toFixed(1)).join(" ");
       fatLine = `<path d="${fLinePath}" fill="none" stroke="#f59e0b" stroke-width="2.25" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round" />`;
     }
     fatDots = fCoords.map((c, i) => `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${i === fCoords.length - 1 ? 3.5 : 2.2}" fill="#f59e0b" />`).join("");
+
+    if (targetFat) {
+      const fty = Number(fatScale(targetFat).toFixed(1));
+      const ftLabelText = `目標 ${targetFat}%`;
+      const ftLabelW = ftLabelText.length * 8 + 8;
+      const ftOnTop = fty < chartTop + 16;
+      const ftLabelY = ftOnTop ? fty + 14 : fty - 5;
+      targetFatLine = `
+        <line x1="${padX}" y1="${fty}" x2="${w - padX}" y2="${fty}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2 3" />
+        <rect x="${padX}" y="${ftLabelY - 11}" width="${ftLabelW}" height="15" fill="var(--surface)" opacity="0.88" rx="3" />
+        <text x="${padX + 4}" y="${ftLabelY}" font-size="10.5" fill="#f59e0b" text-anchor="start" font-weight="700">${ftLabelText}</text>
+      `;
+    }
   }
 
   let targetLine = "";
@@ -837,8 +857,10 @@ function buildWeightSvg(weightPoints, fatPoints, target) {
   const lastLabel = weightPoints[weightPoints.length - 1].date.slice(5).replace("-", "/");
   return `
     <svg viewBox="0 0 ${w} ${totalH}" style="width:100%; height:auto; display:block; overflow:visible;">
+      ${gridLines}
       <path d="${wAreaPath}" fill="var(--primary-tint)" stroke="none" />
       ${targetLine}
+      ${targetFatLine}
       <path d="${wLinePath}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
       ${fatLine}
       ${wDots}
@@ -975,6 +997,7 @@ document.getElementById("weightMonthSelect").addEventListener("change", (e) => {
 
 function renderWeight() {
   document.getElementById("targetWeight").value = state.settings.targetWeight ?? "";
+  document.getElementById("targetBodyFat").value = state.settings.targetBodyFat ?? "";
   const dateInput = document.getElementById("weightDate");
   dateInput.value = dateInput.value || new Date().toISOString().slice(0, 10);
   const hourInput = document.getElementById("weightHour");
@@ -988,6 +1011,7 @@ function renderWeight() {
   document.getElementById("weightStatFat").textContent = latest ? fmtFat(latest.bodyFat) || "--%" : "--%";
 
   const target = state.settings.targetWeight;
+  const targetFat = state.settings.targetBodyFat;
   const toGoalEl = document.getElementById("weightStatToGoal");
   if (target && latest) {
     const diff = Math.round((latest.weight - target) * 10) / 10;
@@ -1014,13 +1038,15 @@ function renderWeight() {
       document.getElementById("weightChart").innerHTML = "";
       document.getElementById("fatLegendItem").hidden = true;
       document.getElementById("targetLegendItem").hidden = true;
+      document.getElementById("targetFatLegendItem").hidden = true;
       document.getElementById("weightProgressBadge").hidden = true;
     } else {
       rangeEmptyEl.hidden = true;
       const fatsInRange = filtered.filter((p) => p.bodyFat !== null && p.bodyFat !== undefined && p.bodyFat !== "");
       document.getElementById("fatLegendItem").hidden = fatsInRange.length === 0;
       document.getElementById("targetLegendItem").hidden = !target;
-      document.getElementById("weightChart").innerHTML = buildWeightSvg(filtered, fatsInRange, target || null);
+      document.getElementById("targetFatLegendItem").hidden = !targetFat || fatsInRange.length === 0;
+      document.getElementById("weightChart").innerHTML = buildWeightSvg(filtered, fatsInRange, target || null, targetFat || null);
       renderWeightProgressBadge(filtered, weightChartRange);
     }
   }
@@ -1068,10 +1094,12 @@ function renderWeightProgressBadge(points, range) {
 document.getElementById("targetWeightForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const raw = document.getElementById("targetWeight").value;
+  const rawFat = document.getElementById("targetBodyFat").value;
   state.settings.targetWeight = raw === "" ? null : parseFloat(raw);
+  state.settings.targetBodyFat = rawFat === "" ? null : parseFloat(rawFat);
   saveSettings();
   renderWeight();
-  showToast("目標体重を保存しました");
+  showToast("目標を保存しました");
 });
 
 document.getElementById("weightForm").addEventListener("submit", (e) => {

@@ -14,13 +14,15 @@
 <body>
 <div id="app">
 
-  <header class="topbar">
-    <h1 id="topbarTitle">家計簿</h1>
-  </header>
+  <div class="top-sticky">
+    <header class="topbar">
+      <h1 id="topbarTitle">家計簿</h1>
+    </header>
 
-  <div class="mode-switch">
-    <button type="button" class="mode-btn active" data-mode="money">💰 家計簿</button>
-    <button type="button" class="mode-btn" data-mode="health">❤️ 健康管理</button>
+    <div class="mode-switch">
+      <button type="button" class="mode-btn active" data-mode="money">💰 家計簿</button>
+      <button type="button" class="mode-btn" data-mode="health">❤️ 健康管理</button>
+    </div>
   </div>
 
   <main id="views">
@@ -328,10 +330,7 @@
         <p class="meal-card-note" id="mealCardNote" hidden></p>
         <div id="mealList" class="meal-list"></div>
       </div>
-    </section>
 
-    <!-- ============ 健康管理：体重管理（グラフ） ============ -->
-    <section id="view-weight-chart" class="view">
       <div class="weight-stats-row">
         <div class="advice-stat">
           <span class="advice-stat-label">現在の体重</span>
@@ -365,6 +364,7 @@
           <span class="legend-pill weight"><i></i>体重</span>
           <span class="legend-pill fat" id="fatLegendItem" hidden><i></i>体脂肪率</span>
           <span class="legend-pill target" id="targetLegendItem" hidden><i></i>目標体重</span>
+          <span class="legend-pill target-fat" id="targetFatLegendItem" hidden><i></i>目標体脂肪率</span>
         </div>
         <div id="weightChart"></div>
         <p id="weightRangeEmpty" class="empty-state" hidden>この期間の記録がありません。</p>
@@ -415,14 +415,21 @@
     <!-- ============ 健康管理：目標設定 ============ -->
     <section id="view-weight-goal" class="view">
       <div class="section-heading" style="margin-top:10px;">
-        <h2>目標体重</h2>
+        <h2>目標設定</h2>
       </div>
-      <form id="targetWeightForm" class="tx-form inline-form">
+      <form id="targetWeightForm" class="tx-form">
         <label class="field">
           <span>目標体重（任意）</span>
           <div class="amount-input-wrap">
             <input type="number" id="targetWeight" inputmode="decimal" step="0.1" min="0" placeholder="例）60.0" />
             <span class="unit-suffix">kg</span>
+          </div>
+        </label>
+        <label class="field">
+          <span>目標体脂肪率（任意）</span>
+          <div class="amount-input-wrap">
+            <input type="number" id="targetBodyFat" inputmode="decimal" step="0.1" min="0" max="100" placeholder="例）18.0" />
+            <span class="unit-suffix">%</span>
           </div>
         </label>
         <button type="submit" class="ghost-btn">保存</button>
@@ -452,9 +459,6 @@
   <nav class="tabbar" id="tabbarHealth" hidden>
     <button class="tab-btn" data-view="home-health">
       <span class="tab-icon">🏠</span><span>ホーム</span>
-    </button>
-    <button class="tab-btn" data-view="weight-chart">
-      <span class="tab-icon">📈</span><span>体重管理</span>
     </button>
     <button class="tab-btn" data-view="weight-entry">
       <span class="tab-icon">➕</span><span>登録</span>
