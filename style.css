@@ -646,16 +646,20 @@ html, body {
   padding: 10px 12px 12px;
   margin-top: -7px;
 }
-.legend-meal-breakdown { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.legend-meal-chip {
+.meal-avg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.meal-avg-item {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
+.meal-avg-label { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.meal-avg-value { font-size: 16px; font-weight: 800; color: var(--text); }
+.meal-avg-value small { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+.meal-avg-sub { font-size: 10.5px; color: var(--text-muted); }
 .legend-detail-list { display: flex; flex-direction: column; gap: 6px; }
 .legend-detail-item {
   display: flex;

@@ -381,6 +381,31 @@ function buildAdvice(cycle, spent, budget) {
 }
 
 // ---------- ホーム画面 ----------
+let homeCategoryRange = "cycle";
+document.querySelectorAll("#homeCategoryRangePills .range-pill").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#homeCategoryRangePills .range-pill").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    homeCategoryRange = btn.dataset.range;
+    renderHome();
+  });
+});
+
+function txsForHomeRange(cycle, range) {
+  if (range === "month") {
+    return state.transactions.filter((t) => monthKey(t.date) === thisMonthKey());
+  }
+  if (range === "30d") {
+    const cutoff = todayMidnight();
+    cutoff.setDate(cutoff.getDate() - 29);
+    return state.transactions.filter((t) => txDate(t) >= cutoff);
+  }
+  if (range === "all") {
+    return state.transactions.slice();
+  }
+  return transactionsInCycle(cycle);
+}
+
 function renderHome() {
   const cycle = getCurrentCycle();
   const txs = transactionsInCycle(cycle).sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -403,9 +428,10 @@ function renderHome() {
   document.getElementById("homeAdviceIcon").textContent = advice.icon;
   document.getElementById("homeAdviceText").textContent = advice.text;
 
-  // カテゴリ別
+  // カテゴリ別（期間は選択式：今サイクル／今月／直近1ヶ月／すべて）
+  const rangeTxs = txsForHomeRange(cycle, homeCategoryRange).sort((a, b) => (a.date < b.date ? 1 : -1));
   const byCat = {};
-  txs.forEach((t) => {
+  rangeTxs.forEach((t) => {
     byCat[t.category] = (byCat[t.category] || 0) + t.amount;
   });
   const catList = document.getElementById("homeCategoryList");
@@ -427,7 +453,7 @@ function renderHome() {
       catList.appendChild(row);
     });
 
-  // 一覧
+  // 一覧（今サイクル分。カテゴリ別の期間選択とは独立）
   const listEl = document.getElementById("homeTxList");
   const emptyEl = document.getElementById("homeEmptyState");
   document.getElementById("homeTxCount").textContent = `${txs.length}件`;
@@ -571,13 +597,28 @@ function renderAnalysisBody() {
 
       let mealHtml = "";
       if (id === "food") {
-        const mealTotals = {};
+        const mealStats = {};
         catTxs.forEach((t) => {
           const k = t.mealType || "none";
-          mealTotals[k] = (mealTotals[k] || 0) + t.amount;
+          if (!mealStats[k]) mealStats[k] = { total: 0, count: 0 };
+          mealStats[k].total += t.amount;
+          mealStats[k].count += 1;
         });
-        mealHtml = `<div class="legend-meal-breakdown">${Object.entries(mealTotals)
-          .map(([k, v]) => `<span class="legend-meal-chip">${k === "none" ? "未選択" : MEAL_TYPES[k]} ${yen(v)}</span>`)
+        const mealOrder = ["breakfast", "lunch", "dinner", "other", "none"];
+        mealHtml = `<div class="meal-avg-grid">${mealOrder
+          .filter((k) => mealStats[k])
+          .map((k) => {
+            const { total, count } = mealStats[k];
+            const avg = Math.round(total / count);
+            const label = k === "none" ? "🍽️ 未選択" : MEAL_TYPES[k];
+            return `
+              <div class="meal-avg-item">
+                <span class="meal-avg-label">${label}</span>
+                <span class="meal-avg-value">${yen(avg)}<small>/回</small></span>
+                <span class="meal-avg-sub">計${yen(total)} ・ ${count}回</span>
+              </div>
+            `;
+          })
           .join("")}</div>`;
       }
 
