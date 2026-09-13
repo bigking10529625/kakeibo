@@ -1218,15 +1218,34 @@ document.getElementById("weightForm").addEventListener("submit", (e) => {
 const WORKOUT_TYPES = {
   walking: "🚶 ウォーキング",
   running: "🏃 ランニング",
+  basketball: "🏀 バスケ",
   strength: "💪 筋トレ",
   other: "🏋️ その他の運動",
 };
 const WORKOUT_DISTANCE_TYPES = ["walking", "running"];
+const WORKOUT_MENU_TYPES = ["strength"];
+// ざっくり消費カロリー計算用のMET(運動強度)の目安値
+const WORKOUT_MET = { walking: 4.3, running: 9.0, basketball: 6.5, strength: 5.0, other: 5.0 };
+
+function latestKnownWeight() {
+  const desc = sortedWeightLogs("desc");
+  return desc.length > 0 ? desc[0].weight : null;
+}
+
+// 消費カロリー = MET × 3.5 × 体重(kg) / 200 × 時間(分)（ざっくり計算）
+function estimateWorkoutCalories(type, durationMin) {
+  if (!durationMin) return null;
+  const met = WORKOUT_MET[type] || 5.0;
+  const weightKg = latestKnownWeight() || 65;
+  return Math.round(((met * 3.5 * weightKg) / 200) * durationMin);
+}
 
 const workoutTypeSelect = document.getElementById("workoutType");
-workoutTypeSelect.addEventListener("change", () => {
+function syncWorkoutFieldVisibility() {
   document.getElementById("workoutDistanceField").hidden = !WORKOUT_DISTANCE_TYPES.includes(workoutTypeSelect.value);
-});
+  document.getElementById("workoutMenuField").hidden = !WORKOUT_MENU_TYPES.includes(workoutTypeSelect.value);
+}
+workoutTypeSelect.addEventListener("change", syncWorkoutFieldVisibility);
 
 function sortedWorkouts(order) {
   const withIndex = state.workouts.map((w, i) => ({ ...w, _i: i }));
@@ -1245,11 +1264,15 @@ function renderWorkoutList() {
     const detailParts = [];
     if (w.duration) detailParts.push(`${w.duration}分`);
     if (w.distance) detailParts.push(`${w.distance}km`);
+    if (w.calories) detailParts.push(`約${w.calories}kcal`);
+    const metaParts = [w.date];
+    if (w.menu) metaParts.push("📺 " + escapeHtml(w.menu));
+    if (w.memo) metaParts.push(escapeHtml(w.memo));
     row.innerHTML = `
       <div class="tx-emoji">${WORKOUT_TYPES[w.type] ? WORKOUT_TYPES[w.type].slice(0, 2) : "🏃"}</div>
       <div class="tx-main">
         <div class="tx-cat">${WORKOUT_TYPES[w.type] || w.type}${detailParts.length ? " ・ " + detailParts.join(" ・ ") : ""}</div>
-        <div class="tx-meta">${w.date}${w.memo ? " ・ " + escapeHtml(w.memo) : ""}</div>
+        <div class="tx-meta">${metaParts.join(" ・ ")}</div>
       </div>
       <button class="tx-delete" data-id="${w.id}" aria-label="削除">✕</button>
     `;
@@ -1270,7 +1293,7 @@ function renderWorkoutList() {
 function renderWorkout() {
   const dateInput = document.getElementById("workoutDate");
   dateInput.value = dateInput.value || new Date().toISOString().slice(0, 10);
-  document.getElementById("workoutDistanceField").hidden = !WORKOUT_DISTANCE_TYPES.includes(workoutTypeSelect.value);
+  syncWorkoutFieldVisibility();
   renderWorkoutList();
 }
 
@@ -1279,11 +1302,14 @@ document.getElementById("workoutForm").addEventListener("submit", (e) => {
   const type = workoutTypeSelect.value;
   const distanceRaw = document.getElementById("workoutDistance").value;
   const durationRaw = document.getElementById("workoutDuration").value;
+  const duration = durationRaw === "" ? null : parseInt(durationRaw, 10);
   const entry = {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     type,
     distance: distanceRaw === "" ? null : parseFloat(distanceRaw),
-    duration: durationRaw === "" ? null : parseInt(durationRaw, 10),
+    duration,
+    calories: estimateWorkoutCalories(type, duration),
+    menu: WORKOUT_MENU_TYPES.includes(type) ? document.getElementById("workoutMenu").value.trim() : "",
     date: document.getElementById("workoutDate").value,
     memo: document.getElementById("workoutMemo").value.trim(),
   };
@@ -1308,8 +1334,12 @@ function renderWorkoutSummary() {
   cutoff.setDate(cutoff.getDate() - 6);
   const recent = state.workouts.filter((w) => txDate(w) >= cutoff);
   const totalMinutes = recent.reduce((s, w) => s + (w.duration || 0), 0);
+  const totalCalories = recent.reduce((s, w) => s + (w.calories || 0), 0);
   document.getElementById("workoutSummaryValue").textContent = `${recent.length}回`;
-  document.getElementById("workoutSummarySide").textContent = totalMinutes > 0 ? `計${totalMinutes}分` : "";
+  const sideParts = [];
+  if (totalMinutes > 0) sideParts.push(`計${totalMinutes}分`);
+  if (totalCalories > 0) sideParts.push(`約${totalCalories}kcal`);
+  document.getElementById("workoutSummarySide").textContent = sideParts.join(" ・ ");
 }
 
 // ---------- 予算画面 ----------

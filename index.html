@@ -441,6 +441,7 @@
           <select id="workoutType">
             <option value="walking">🚶 ウォーキング</option>
             <option value="running">🏃 ランニング</option>
+            <option value="basketball">🏀 バスケ</option>
             <option value="strength">💪 筋トレ</option>
             <option value="other">🏋️ その他の運動</option>
           </select>
@@ -451,6 +452,10 @@
             <input type="number" id="workoutDistance" inputmode="decimal" step="0.1" min="0" placeholder="例）3.0" />
             <span class="unit-suffix">km</span>
           </div>
+        </label>
+        <label class="field" id="workoutMenuField" hidden>
+          <span>メニュー（TikTok動画など・任意）</span>
+          <input type="text" id="workoutMenu" placeholder="例）〇〇チャンネルの腹筋メニュー" />
         </label>
         <label class="field">
           <span>時間（任意）</span>
