@@ -453,6 +453,23 @@ html, body {
 .weight-snapshot-delta.up { color: var(--danger); }
 .weight-snapshot-fat { font-size: 12px; color: var(--text-muted); }
 
+.workout-summary {
+  margin-top: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow);
+}
+.workout-summary-main { display: flex; flex-direction: column; gap: 2px; }
+.workout-summary-side { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+.legend-pill.workout { color: #10b981; }
+.legend-pill.workout i { background: currentColor; border-radius: 50%; width: 8px; height: 8px; }
+
 /* Weight view */
 .inline-form { flex-direction: row; align-items: flex-end; gap: 10px; }
 .inline-form .field { flex: 1; }

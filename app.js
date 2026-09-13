@@ -112,6 +112,7 @@ const STORAGE_SETTINGS = "kakeibo_settings";
 const STORAGE_WEIGHT = "kakeibo_weight_logs";
 const STORAGE_INCOME = "kakeibo_income";
 const STORAGE_FIXED_COSTS = "kakeibo_fixed_costs";
+const STORAGE_WORKOUTS = "kakeibo_workouts";
 
 const state = {
   transactions: loadTransactions(),
@@ -119,6 +120,7 @@ const state = {
   weightLogs: loadWeightLogs(),
   income: loadIncome(),
   fixedCosts: loadFixedCosts(),
+  workouts: loadWorkouts(),
   ocrAmountGuess: null,
 };
 
@@ -177,6 +179,17 @@ function loadFixedCosts() {
 }
 function saveFixedCosts() {
   localStorage.setItem(STORAGE_FIXED_COSTS, JSON.stringify(state.fixedCosts));
+}
+function loadWorkouts() {
+  try {
+    const raw = localStorage.getItem(STORAGE_WORKOUTS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+function saveWorkouts() {
+  localStorage.setItem(STORAGE_WORKOUTS, JSON.stringify(state.workouts));
 }
 
 // ---------- 日付ユーティリティ ----------
@@ -287,6 +300,7 @@ const titles = {
   "home-health": "健康管理",
   "weight-entry": "体重を記録",
   "weight-goal": "目標設定",
+  workout: "ワークアウト",
 };
 
 function showView(name) {
@@ -303,6 +317,7 @@ function showView(name) {
     renderWeight();
   }
   if (name === "weight-entry" || name === "weight-goal") renderWeight();
+  if (name === "workout") renderWorkout();
 }
 
 // ---------- モード切替（家計簿 / 健康管理） ----------
@@ -497,6 +512,7 @@ function escapeHtml(s) {
 function renderHealthHome() {
   renderWeightSnapshot();
   renderMealSuggestions();
+  renderWorkoutSummary();
   document.getElementById("healthHomeEmpty").hidden = state.weightLogs.length > 0;
 }
 
@@ -804,7 +820,7 @@ function makeScale(values, padFrac, top, bottom) {
 }
 
 // weightPoints: [{date, weight}] 昇順, fatPoints: [{date, bodyFat}] 昇順(体脂肪が入っている記録のみ), target: 目標体重 or null
-function buildWeightSvg(weightPoints, fatPoints, target, targetFat) {
+function buildWeightSvg(weightPoints, fatPoints, target, targetFat, workoutDates) {
   if (weightPoints.length === 0) return "";
   const w = 340,
     chartTop = 12,
@@ -828,6 +844,21 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat) {
     if (minTs === maxTs) return padX + (w - padX * 2) / 2;
     return padX + ((pointTs(p) - minTs) / (maxTs - minTs)) * (w - padX * 2);
   };
+  const xOfTs = (ts) => {
+    if (minTs === maxTs) return padX + (w - padX * 2) / 2;
+    return padX + ((ts - minTs) / (maxTs - minTs)) * (w - padX * 2);
+  };
+
+  // 運動した日をグラフ下部に緑の点で表示（体重推移との関連を見やすくする）
+  let workoutMarkers = "";
+  if (workoutDates && workoutDates.length) {
+    workoutDates.forEach((wd) => {
+      const ts = new Date(wd + "T12:00:00").getTime();
+      if (ts < minTs || ts > maxTs) return;
+      const x = xOfTs(ts);
+      workoutMarkers += `<circle cx="${x.toFixed(1)}" cy="${(chartH + 7).toFixed(1)}" r="2.5" fill="#10b981" />`;
+    });
+  }
 
   const weightValues = weightPoints.map((p) => p.weight).concat(target ? [target] : []);
   const weightScale = makeScale(weightValues, 0.15, chartTop, chartH);
@@ -919,6 +950,7 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat) {
       ${fatDots}
       ${firstDotLabel}
       ${lastDotCluster}
+      ${workoutMarkers}
       <text x="${padX}" y="${labelY}" font-size="11" fill="var(--text-muted)">${firstLabel}</text>
       <text x="${w - padX}" y="${labelY}" font-size="11" fill="var(--text-muted)" text-anchor="end">${lastLabel}</text>
     </svg>
@@ -1091,6 +1123,7 @@ function renderWeight() {
       document.getElementById("fatLegendItem").hidden = true;
       document.getElementById("targetLegendItem").hidden = true;
       document.getElementById("targetFatLegendItem").hidden = true;
+      document.getElementById("workoutLegendItem").hidden = true;
       document.getElementById("weightProgressBadge").hidden = true;
     } else {
       rangeEmptyEl.hidden = true;
@@ -1098,7 +1131,11 @@ function renderWeight() {
       document.getElementById("fatLegendItem").hidden = fatsInRange.length === 0;
       document.getElementById("targetLegendItem").hidden = !target;
       document.getElementById("targetFatLegendItem").hidden = !targetFat || fatsInRange.length === 0;
-      document.getElementById("weightChart").innerHTML = buildWeightSvg(filtered, fatsInRange, target || null, targetFat || null);
+      const rangeStart = filtered[0].date;
+      const rangeEnd = filtered[filtered.length - 1].date;
+      const workoutDatesInRange = [...new Set(state.workouts.map((w) => w.date).filter((d) => d >= rangeStart && d <= rangeEnd))];
+      document.getElementById("workoutLegendItem").hidden = workoutDatesInRange.length === 0;
+      document.getElementById("weightChart").innerHTML = buildWeightSvg(filtered, fatsInRange, target || null, targetFat || null, workoutDatesInRange);
       renderWeightProgressBadge(filtered, weightChartRange);
     }
   }
@@ -1176,6 +1213,104 @@ document.getElementById("weightForm").addEventListener("submit", (e) => {
   renderWeightSnapshot();
   showToast("記録しました");
 });
+
+// ---------- ワークアウト ----------
+const WORKOUT_TYPES = {
+  walking: "🚶 ウォーキング",
+  running: "🏃 ランニング",
+  strength: "💪 筋トレ",
+  other: "🏋️ その他の運動",
+};
+const WORKOUT_DISTANCE_TYPES = ["walking", "running"];
+
+const workoutTypeSelect = document.getElementById("workoutType");
+workoutTypeSelect.addEventListener("change", () => {
+  document.getElementById("workoutDistanceField").hidden = !WORKOUT_DISTANCE_TYPES.includes(workoutTypeSelect.value);
+});
+
+function sortedWorkouts(order) {
+  const withIndex = state.workouts.map((w, i) => ({ ...w, _i: i }));
+  withIndex.sort((a, b) => (a.date !== b.date ? (a.date < b.date ? -1 : 1) : a._i - b._i));
+  return order === "desc" ? withIndex.reverse() : withIndex;
+}
+
+function renderWorkoutList() {
+  const listEl = document.getElementById("workoutLogList");
+  listEl.innerHTML = "";
+  const all = sortedWorkouts("desc");
+  document.getElementById("workoutLogCount").textContent = `${all.length}件`;
+  all.slice(0, 30).forEach((w) => {
+    const row = document.createElement("div");
+    row.className = "tx-row";
+    const detailParts = [];
+    if (w.duration) detailParts.push(`${w.duration}分`);
+    if (w.distance) detailParts.push(`${w.distance}km`);
+    row.innerHTML = `
+      <div class="tx-emoji">${WORKOUT_TYPES[w.type] ? WORKOUT_TYPES[w.type].slice(0, 2) : "🏃"}</div>
+      <div class="tx-main">
+        <div class="tx-cat">${WORKOUT_TYPES[w.type] || w.type}${detailParts.length ? " ・ " + detailParts.join(" ・ ") : ""}</div>
+        <div class="tx-meta">${w.date}${w.memo ? " ・ " + escapeHtml(w.memo) : ""}</div>
+      </div>
+      <button class="tx-delete" data-id="${w.id}" aria-label="削除">✕</button>
+    `;
+    listEl.appendChild(row);
+  });
+  listEl.querySelectorAll(".tx-delete").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.workouts = state.workouts.filter((w) => w.id !== btn.dataset.id);
+      saveWorkouts();
+      renderWorkoutList();
+      renderWorkoutSummary();
+      renderWeight();
+      showToast("削除しました");
+    });
+  });
+}
+
+function renderWorkout() {
+  const dateInput = document.getElementById("workoutDate");
+  dateInput.value = dateInput.value || new Date().toISOString().slice(0, 10);
+  document.getElementById("workoutDistanceField").hidden = !WORKOUT_DISTANCE_TYPES.includes(workoutTypeSelect.value);
+  renderWorkoutList();
+}
+
+document.getElementById("workoutForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const type = workoutTypeSelect.value;
+  const distanceRaw = document.getElementById("workoutDistance").value;
+  const durationRaw = document.getElementById("workoutDuration").value;
+  const entry = {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+    type,
+    distance: distanceRaw === "" ? null : parseFloat(distanceRaw),
+    duration: durationRaw === "" ? null : parseInt(durationRaw, 10),
+    date: document.getElementById("workoutDate").value,
+    memo: document.getElementById("workoutMemo").value.trim(),
+  };
+  state.workouts.push(entry);
+  saveWorkouts();
+  document.getElementById("workoutForm").reset();
+  renderWorkout();
+  renderWorkoutSummary();
+  renderWeight();
+  showToast("記録しました");
+});
+
+// 直近7日間の運動回数・時間を健康ホームに表示
+function renderWorkoutSummary() {
+  const card = document.getElementById("workoutSummary");
+  if (state.workouts.length === 0) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  const cutoff = todayMidnight();
+  cutoff.setDate(cutoff.getDate() - 6);
+  const recent = state.workouts.filter((w) => txDate(w) >= cutoff);
+  const totalMinutes = recent.reduce((s, w) => s + (w.duration || 0), 0);
+  document.getElementById("workoutSummaryValue").textContent = `${recent.length}回`;
+  document.getElementById("workoutSummarySide").textContent = totalMinutes > 0 ? `計${totalMinutes}分` : "";
+}
 
 // ---------- 予算画面 ----------
 const paydaySelect = document.getElementById("paydayDay");
@@ -1395,6 +1530,7 @@ document.getElementById("exportDataBtn").addEventListener("click", () => {
     weightLogs: state.weightLogs,
     income: state.income,
     fixedCosts: state.fixedCosts,
+    workouts: state.workouts,
     exportedAt: new Date().toISOString(),
   });
   const box = document.getElementById("exportBox");
@@ -1435,11 +1571,13 @@ document.getElementById("importDataBtn").addEventListener("click", () => {
   state.weightLogs = Array.isArray(data.weightLogs) ? data.weightLogs : [];
   state.income = data.income && typeof data.income === "object" ? data.income : {};
   state.fixedCosts = Array.isArray(data.fixedCosts) ? data.fixedCosts : [];
+  state.workouts = Array.isArray(data.workouts) ? data.workouts : [];
   saveTransactions();
   saveSettings();
   saveWeightLogs();
   saveIncome();
   saveFixedCosts();
+  saveWorkouts();
   document.getElementById("importTextarea").value = "";
   document.getElementById("importBox").hidden = true;
   showToast("読み込みました");
@@ -1453,11 +1591,13 @@ document.getElementById("resetDataBtn").addEventListener("click", () => {
     state.weightLogs = [];
     state.income = {};
     state.fixedCosts = [];
+    state.workouts = [];
     saveTransactions();
     saveSettings();
     saveWeightLogs();
     saveIncome();
     saveFixedCosts();
+    saveWorkouts();
     renderBudget();
     showToast("データを削除しました");
   }

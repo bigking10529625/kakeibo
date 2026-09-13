@@ -334,6 +334,14 @@
       </div>
       <p class="empty-state" id="healthHomeEmpty" hidden>まだ体重の記録がありません。「登録」タブから記録してみましょう。</p>
 
+      <div class="workout-summary" id="workoutSummary" hidden>
+        <div class="workout-summary-main">
+          <span class="weight-snapshot-label">直近7日の運動</span>
+          <span class="weight-snapshot-value" id="workoutSummaryValue">0回</span>
+        </div>
+        <span class="workout-summary-side" id="workoutSummarySide"></span>
+      </div>
+
       <div class="meal-card" id="mealCard" hidden>
         <div class="meal-card-head">
           <h2>🥗 今日のごはん提案</h2>
@@ -377,6 +385,7 @@
           <span class="legend-pill fat" id="fatLegendItem" hidden><i></i>体脂肪率</span>
           <span class="legend-pill target" id="targetLegendItem" hidden><i></i>目標体重</span>
           <span class="legend-pill target-fat" id="targetFatLegendItem" hidden><i></i>目標体脂肪率</span>
+          <span class="legend-pill workout" id="workoutLegendItem" hidden><i></i>運動した日</span>
         </div>
         <div id="weightChart"></div>
         <p id="weightRangeEmpty" class="empty-state" hidden>この期間の記録がありません。</p>
@@ -422,6 +431,49 @@
         </label>
         <button type="submit" class="primary-btn">記録する</button>
       </form>
+    </section>
+
+    <!-- ============ 健康管理：ワークアウト ============ -->
+    <section id="view-workout" class="view">
+      <form id="workoutForm" class="tx-form" style="margin-top:10px;">
+        <label class="field">
+          <span>種類</span>
+          <select id="workoutType">
+            <option value="walking">🚶 ウォーキング</option>
+            <option value="running">🏃 ランニング</option>
+            <option value="strength">💪 筋トレ</option>
+            <option value="other">🏋️ その他の運動</option>
+          </select>
+        </label>
+        <label class="field" id="workoutDistanceField">
+          <span>距離（任意）</span>
+          <div class="amount-input-wrap">
+            <input type="number" id="workoutDistance" inputmode="decimal" step="0.1" min="0" placeholder="例）3.0" />
+            <span class="unit-suffix">km</span>
+          </div>
+        </label>
+        <label class="field">
+          <span>時間（任意）</span>
+          <div class="amount-input-wrap">
+            <input type="number" id="workoutDuration" inputmode="numeric" min="0" placeholder="例）30" />
+            <span class="unit-suffix">分</span>
+          </div>
+        </label>
+        <label class="field">
+          <span>日付</span>
+          <input type="date" id="workoutDate" required />
+        </label>
+        <label class="field">
+          <span>メモ（任意）</span>
+          <input type="text" id="workoutMemo" placeholder="例）公園を1周" />
+        </label>
+        <button type="submit" class="primary-btn">記録する</button>
+      </form>
+
+      <details class="list-details" id="workoutLogDetails">
+        <summary>記録一覧を見る<span class="count-badge" id="workoutLogCount">0件</span></summary>
+        <div id="workoutLogList" class="tx-list"></div>
+      </details>
     </section>
 
     <!-- ============ 健康管理：目標設定 ============ -->
@@ -474,6 +526,9 @@
     </button>
     <button class="tab-btn" data-view="weight-entry">
       <span class="tab-icon">➕</span><span>登録</span>
+    </button>
+    <button class="tab-btn" data-view="workout">
+      <span class="tab-icon">🏃</span><span>ワークアウト</span>
     </button>
     <button class="tab-btn" data-view="weight-goal">
       <span class="tab-icon">🎯</span><span>目標設定</span>
