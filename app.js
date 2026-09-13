@@ -534,6 +534,33 @@ function renderAnalysis() {
 
 let analysisExpandedCategory = null;
 
+// 食事の種類ごとの「1回あたり平均」グリッドのHTMLを組み立てる
+function buildMealAverageHtml(foodTxs) {
+  const mealStats = {};
+  foodTxs.forEach((t) => {
+    const k = t.mealType || "none";
+    if (!mealStats[k]) mealStats[k] = { total: 0, count: 0 };
+    mealStats[k].total += t.amount;
+    mealStats[k].count += 1;
+  });
+  const mealOrder = ["breakfast", "lunch", "dinner", "other", "none"];
+  return `<div class="meal-avg-grid">${mealOrder
+    .filter((k) => mealStats[k])
+    .map((k) => {
+      const { total, count } = mealStats[k];
+      const avg = Math.round(total / count);
+      const label = k === "none" ? "🍽️ 未選択" : MEAL_TYPES[k];
+      return `
+        <div class="meal-avg-item">
+          <span class="meal-avg-label">${label}</span>
+          <span class="meal-avg-value">${yen(avg)}<small>/回</small></span>
+          <span class="meal-avg-sub">計${yen(total)} ・ ${count}回</span>
+        </div>
+      `;
+    })
+    .join("")}</div>`;
+}
+
 function renderAnalysisBody() {
   const mk = document.getElementById("analysisMonth").value || thisMonthKey();
   const txs = state.transactions.filter((t) => monthKey(t.date) === mk);
@@ -541,6 +568,17 @@ function renderAnalysisBody() {
 
   document.getElementById("analysisTotal").textContent = yen(total);
   document.getElementById("analysisCount").textContent = `${txs.length} 件`;
+
+  const foodTxs = txs.filter((t) => t.category === "food");
+  const mealSection = document.getElementById("mealAverageSection");
+  const mealEmpty = document.getElementById("mealAverageEmpty");
+  if (foodTxs.length === 0) {
+    mealSection.innerHTML = "";
+    mealEmpty.hidden = false;
+  } else {
+    mealEmpty.hidden = true;
+    mealSection.innerHTML = buildMealAverageHtml(foodTxs);
+  }
 
   const byCat = {};
   txs.forEach((t) => {
@@ -595,33 +633,6 @@ function renderAnalysisBody() {
     if (isOpen) {
       const catTxs = txs.filter((t) => t.category === id).sort((a, b) => (a.date < b.date ? 1 : -1));
 
-      let mealHtml = "";
-      if (id === "food") {
-        const mealStats = {};
-        catTxs.forEach((t) => {
-          const k = t.mealType || "none";
-          if (!mealStats[k]) mealStats[k] = { total: 0, count: 0 };
-          mealStats[k].total += t.amount;
-          mealStats[k].count += 1;
-        });
-        const mealOrder = ["breakfast", "lunch", "dinner", "other", "none"];
-        mealHtml = `<div class="meal-avg-grid">${mealOrder
-          .filter((k) => mealStats[k])
-          .map((k) => {
-            const { total, count } = mealStats[k];
-            const avg = Math.round(total / count);
-            const label = k === "none" ? "🍽️ 未選択" : MEAL_TYPES[k];
-            return `
-              <div class="meal-avg-item">
-                <span class="meal-avg-label">${label}</span>
-                <span class="meal-avg-value">${yen(avg)}<small>/回</small></span>
-                <span class="meal-avg-sub">計${yen(total)} ・ ${count}回</span>
-              </div>
-            `;
-          })
-          .join("")}</div>`;
-      }
-
       const itemsHtml = catTxs
         .map(
           (t) => `
@@ -634,7 +645,7 @@ function renderAnalysisBody() {
 
       const detail = document.createElement("div");
       detail.className = "legend-detail";
-      detail.innerHTML = mealHtml + `<div class="legend-detail-list">${itemsHtml}</div>`;
+      detail.innerHTML = `<div class="legend-detail-list">${itemsHtml}</div>`;
       detail.querySelectorAll(".legend-detail-item").forEach((el) => {
         el.addEventListener("click", () => {
           const t = catTxs.find((tx) => tx.id === el.dataset.id);
