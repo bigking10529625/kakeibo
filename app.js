@@ -909,7 +909,6 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat, workoutDates
 
   const wCoords = weightPoints.map((p) => [xOf(p), weightScale(p.weight)]);
   const wLinePath = wCoords.map((c, i) => (i === 0 ? "M" : "L") + c[0].toFixed(1) + "," + c[1].toFixed(1)).join(" ");
-  const wAreaPath = `${wLinePath} L${wCoords[wCoords.length - 1][0].toFixed(1)},${chartH} L${wCoords[0][0].toFixed(1)},${chartH} Z`;
   const lastIdx = wCoords.length - 1;
   const wDots = wCoords
     .slice(0, lastIdx)
@@ -986,7 +985,6 @@ function buildWeightSvg(weightPoints, fatPoints, target, targetFat, workoutDates
     <svg viewBox="0 0 ${w} ${totalH}" style="width:100%; height:auto; display:block; overflow:visible;">
       ${vGridLines}
       ${gridLines}
-      <path d="${wAreaPath}" fill="var(--primary-tint)" stroke="none" />
       ${targetLine}
       ${targetFatLine}
       <path d="${wLinePath}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
