@@ -741,6 +741,37 @@ function trendItemsByWeek(mk) {
   return items;
 }
 
+function fmtTrendAmt(amt) {
+  if (amt <= 0) return "";
+  if (amt < 1000) return `${Math.round(amt)}`;
+  return `${Math.round(amt / 1000)}k`;
+}
+
+// 曜日ごとの「1日あたり平均支出」（その曜日が月内に出現する日数で割る。支出0の日も分母に含める）
+function trendItemsByWeekday(mk) {
+  const [y, m] = mk.split("-").map(Number);
+  const days = daysInMonth(y, m - 1);
+  const monthTx = state.transactions.filter((t) => monthKey(t.date) === mk);
+  const dowLabels = ["日", "月", "火", "水", "木", "金", "土"];
+  const totals = new Array(7).fill(0);
+  const counts = new Array(7).fill(0);
+  for (let d = 1; d <= days; d++) {
+    const dow = new Date(y, m - 1, d).getDay();
+    counts[dow] += 1;
+  }
+  monthTx.forEach((t) => {
+    const dow = txDate(t).getDay();
+    totals[dow] += t.amount;
+  });
+  const order = [1, 2, 3, 4, 5, 6, 0]; // 月火水木金土日の順で表示
+  const todayDow = todayMidnight().getDay();
+  return order.map((dow) => ({
+    label: dowLabels[dow],
+    amt: counts[dow] > 0 ? Math.round(totals[dow] / counts[dow]) : 0,
+    current: dow === todayDow,
+  }));
+}
+
 function renderBarColumns(wrap, items, sparse) {
   wrap.innerHTML = "";
   wrap.classList.toggle("dense", sparse);
@@ -751,7 +782,7 @@ function renderBarColumns(wrap, items, sparse) {
     const h = Math.round((it.amt / max) * 100);
     const showLabel = !sparse || i === 0 || i === items.length - 1 || (i + 1) % 5 === 0;
     col.innerHTML = `
-      <span class="trend-amt">${it.amt > 0 && !sparse ? Math.round(it.amt / 1000) + "k" : ""}</span>
+      <span class="trend-amt">${!sparse ? fmtTrendAmt(it.amt) : ""}</span>
       <div class="trend-bar-track"><div class="trend-bar-fill" style="height:${h}%"></div></div>
       <span class="trend-label">${showLabel ? it.label : ""}</span>
     `;
@@ -770,6 +801,9 @@ function renderTrend() {
   } else if (trendGranularity === "week") {
     subtitleEl.textContent = `${monthLabel(mk)}の週ごとの支出`;
     renderBarColumns(wrap, trendItemsByWeek(mk), false);
+  } else if (trendGranularity === "weekday") {
+    subtitleEl.textContent = `${monthLabel(mk)}の曜日別・1日あたり平均`;
+    renderBarColumns(wrap, trendItemsByWeekday(mk), false);
   } else {
     subtitleEl.textContent = "直近6か月の合計支出";
     renderBarColumns(wrap, trendItemsByMonth(), false);
