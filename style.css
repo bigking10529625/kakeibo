@@ -720,17 +720,21 @@ html, body {
   height: 100%;
   display: flex;
   align-items: flex-end;
+  background: var(--surface-2);
+  border-radius: 6px 6px 2px 2px;
+  overflow: hidden;
 }
 .trend-chart.dense .trend-bar-track { max-width: 8px; }
 .trend-bar-fill {
   width: 100%;
-  background: var(--primary);
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%);
   border-radius: 6px 6px 2px 2px;
-  min-height: 2px;
+  min-height: 3px;
 }
-.trend-col.current .trend-bar-fill { background: var(--primary-dark); }
-.trend-amt { font-size: 10.5px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
-.trend-label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.trend-col.current .trend-bar-fill { background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%); }
+.trend-amt { font-size: 10.5px; color: var(--text); font-weight: 700; white-space: nowrap; }
+.trend-label { font-size: 11px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.trend-col.current .trend-label { color: var(--text); font-weight: 800; }
 .trend-chart.dense .trend-label { font-size: 9px; }
 
 .fixed-cost-total-row {
