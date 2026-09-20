@@ -711,13 +711,13 @@ html, body {
   flex-direction: column;
   align-items: center;
   height: 100%;
-  justify-content: flex-end;
-  gap: 4px;
+  gap: 6px;
 }
 .trend-bar-track {
   width: 100%;
   max-width: 28px;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   align-items: flex-end;
   background: var(--surface-2);
